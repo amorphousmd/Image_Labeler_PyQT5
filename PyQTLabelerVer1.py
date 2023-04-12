@@ -84,9 +84,7 @@ class Ui_Dialog(object):
 
         # Events
         # set up drawing flag and box coordinates
-        self.isDrawing = False
-        self.startPos = None
-        self.endPos = None
+        self.image_loaded = False
 
         # Connections
         self.cd_button.clicked.connect(self.load_image)
@@ -105,12 +103,16 @@ class Ui_Dialog(object):
         self.goto_button.setText(_translate("Dialog", "Go To"))
 
     def load_image(self):
+        for line in self.dottedLines:
+            self.graphicsView.scene().removeItem(line)
+        self.dottedLines = []
         # Get the path to the image file using a file dialog
         self.filename, _ = QFileDialog.getOpenFileName(directory="C:/Users/LAPTOP/Desktop/Pics",
                                                        filter="Images (*.png *.xpm *.jpg *.bmp);;All Files (*)")
         if not self.filename:
             return
         # Load the image file as a pixmap
+        self.graphicsView.scene().clear()
         pixmap = QPixmap(self.filename)
         if pixmap.isNull():
             return
@@ -119,6 +121,7 @@ class Ui_Dialog(object):
         self.scene.addPixmap(pixmap)
         self.graphicsView.setSceneRect(QRectF(pixmap.rect()))
         self.graphicsView.fitInView(QRectF(pixmap.rect()), Qt.KeepAspectRatio)
+        self.image_loaded = True
 
 class MyDialog(QtWidgets.QDialog, Ui_Dialog):
     def __init__(self, parent=None):
@@ -132,6 +135,7 @@ class MyDialog(QtWidgets.QDialog, Ui_Dialog):
         self.endPos = None
         self.drawnBox = False
         self.isDrawing = False
+        self.dottedLines = []  # initialize a list to keep track of the dotted lines
 
     def keyPressEvent(self, event):
         if event.key() == QtCore.Qt.Key_B:
@@ -142,7 +146,42 @@ class MyDialog(QtWidgets.QDialog, Ui_Dialog):
             super().keyPressEvent(event)  # call the base class method to handle other key press events
 
     def eventFilter(self, source, event):
-        if event.type() == QtCore.QEvent.MouseButtonPress and event.button() == QtCore.Qt.LeftButton:
+        if event.type() == QtCore.QEvent.MouseMove:
+            if not self.image_loaded:
+                return super(MyDialog, self).eventFilter(source, event)
+            # get the position of the mouse cursor in the scene coordinates
+            scenePos = self.graphicsView.mapToScene(event.pos())
+
+            # get the rectangle of the visible area in the view coordinates
+            viewRect = self.graphicsView.viewport().rect()
+
+            # clear any existing dotted lines
+            try:
+                for line in self.dottedLines:
+                    self.graphicsView.scene().removeItem(line)
+                self.dottedLines = []
+            except RuntimeError:
+                print('here')
+                return super(MyDialog, self).eventFilter(source, event)
+
+            # create a QPen object for the dotted line
+            dottedLinePen = QtGui.QPen(QtCore.Qt.DotLine)
+            dottedLinePen.setWidth(1)
+
+            # add horizontal and vertical dotted lines intersecting at the cursor position
+            horizLine = QtWidgets.QGraphicsLineItem(viewRect.left(), scenePos.y(), viewRect.right(), scenePos.y())
+            horizLine.setPen(dottedLinePen)
+            self.graphicsView.scene().addItem(horizLine)
+            self.dottedLines.append(horizLine)
+
+            vertLine = QtWidgets.QGraphicsLineItem(scenePos.x(), viewRect.top(), scenePos.x(), viewRect.bottom())
+            vertLine.setPen(dottedLinePen)
+            self.graphicsView.scene().addItem(vertLine)
+            self.dottedLines.append(vertLine)
+
+            return super(MyDialog, self).eventFilter(source, event)
+
+        elif event.type() == QtCore.QEvent.MouseButtonPress and event.button() == QtCore.Qt.LeftButton:
             if self.isDrawing:
                 if not self.drawnBox:
                     # start drawing
