@@ -9,7 +9,7 @@
 
 
 from PyQt5 import QtCore, QtGui, QtWidgets
-from PyQt5.QtGui import QPixmap, QPen
+from PyQt5.QtGui import QPixmap, QPen, QPainter, QColor
 from PyQt5.QtCore import Qt, QRectF, QEvent
 from PyQt5.QtWidgets import QGraphicsScene, QFileDialog
 
@@ -120,34 +120,58 @@ class Ui_Dialog(object):
         self.graphicsView.setSceneRect(QRectF(pixmap.rect()))
         self.graphicsView.fitInView(QRectF(pixmap.rect()), Qt.KeepAspectRatio)
 
-
-    def drawBox(self):
-        # remove previous box item if it exists
-        if self.scene.items():
-            self.scene.removeItem(self.scene.items()[-1])
-
-        # create a new box item and add it to the scene
-        pen = QPen(Qt.green)
-        pen.setWidth(2)
-        rect = QRectF(self.startPos, self.endPos)
-        item = self.scene.addRect(rect, pen)
-        item.setFlag(QtWidgets.QGraphicsItem.ItemIsMovable)
-
 class MyDialog(QtWidgets.QDialog, Ui_Dialog):
     def __init__(self, parent=None):
         super(MyDialog, self).__init__(parent)
         self.setupUi(self)
         self.graphicsView.viewport().installEventFilter(self)
+        self.graphicsView.setMouseTracking(True)  # add this line
+
+        # set the initial values for the bounding box
+        self.startPos = None
+        self.endPos = None
+        self.drawnBox = False
+        self.isDrawing = False
+
+    def keyPressEvent(self, event):
+        if event.key() == QtCore.Qt.Key_B:
+            print('B pressed')
+            self.isDrawing = True
+            event.accept()  # accept the event to stop it from propagating to other widgets
+        else:
+            super().keyPressEvent(event)  # call the base class method to handle other key press events
 
     def eventFilter(self, source, event):
-        print('here')
-        if (event.type() == QtCore.QEvent.MouseButtonPress and
-                event.button() == QtCore.Qt.LeftButton):
-            self.startPos = event.pos()
-            self.endPos = event.pos()
-            self.isDrawing = True
-            return True
+        if event.type() == QtCore.QEvent.MouseButtonPress and event.button() == QtCore.Qt.LeftButton:
+            if self.isDrawing:
+                if not self.drawnBox:
+                    # start drawing
+                    pos = self.graphicsView.mapToScene(event.pos())
+                    self.startPos = pos
+                    self.endPos = pos
+                    self.drawnBox = True
+                    return True
+                else:
+                    # finish drawing
+                    pos = self.graphicsView.mapToScene(event.pos())
+                    self.endPos = pos
+                    self.drawnBox = False
+                    self.isDrawing = False
+                    self.drawBoundingBox()
+                    return True
+
         return super(MyDialog, self).eventFilter(source, event)
+
+    def drawBoundingBox(self):
+        # create a QGraphicsRectItem to represent the bounding box
+        rect = QtCore.QRectF(self.startPos, self.endPos)
+        item = QtWidgets.QGraphicsRectItem(rect)
+        item.setPen(QtGui.QPen(QtGui.QColor(255, 0, 0)))
+        item.setBrush(QtGui.QBrush(QtGui.QColor(255, 0, 0, 50)))
+        self.scene.addItem(item)
+        self.startPos = None
+        self.endPos = None
+        self.drawnBox = False
 
 
 if __name__ == "__main__":
