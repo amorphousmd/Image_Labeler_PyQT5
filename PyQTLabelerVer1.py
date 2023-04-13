@@ -356,6 +356,12 @@ class MyDialog(QtWidgets.QDialog, Ui_Dialog):
             self.graphicsView.scene().addItem(vertLine)
             self.dottedLines.append(vertLine)
 
+            if self.drawnBox:
+                pos = self.graphicsView.mapToScene(event.pos())
+                self.endPos = pos
+                self.drawBoundingBoxPreview()
+
+
             return super(MyDialog, self).eventFilter(source, event)
 
         elif event.type() == QtCore.QEvent.MouseButtonPress and event.button() == QtCore.Qt.LeftButton:
@@ -394,6 +400,11 @@ class MyDialog(QtWidgets.QDialog, Ui_Dialog):
 
     def drawBoundingBox(self):
         # create a QGraphicsRectItem to represent the bounding box
+        items = self.scene.items()
+        # Iterate through the list to find the item you're looking for
+        for item in items:
+            if isinstance(item, QtWidgets.QGraphicsRectItem) and item.data(0) == 'preview_box':
+                self.scene.removeItem(item)
         rect = QtCore.QRectF(self.startPos, self.endPos)
         item = QtWidgets.QGraphicsRectItem(rect)
         R, G, B = [int(i * 255) for i in _COLORS[int(self.current_class_id)]]  # convert values to integers in range [0, 255]
@@ -403,6 +414,23 @@ class MyDialog(QtWidgets.QDialog, Ui_Dialog):
         self.startPos = None
         self.endPos = None
         self.drawnBox = False
+
+    def drawBoundingBoxPreview(self):
+        items = self.scene.items()
+
+        # Iterate through the list to find the item you're looking for
+        for item in items:
+            if isinstance(item, QtWidgets.QGraphicsRectItem) and item.data(0) == 'preview_box':
+                self.scene.removeItem(item)
+        # create a QGraphicsRectItem to represent the bounding box
+        rect = QtCore.QRectF(self.startPos, self.endPos)
+        item = QtWidgets.QGraphicsRectItem(rect)
+        R, G, B = [int(i * 255) for i in
+                   _COLORS[int(self.current_class_id)]]  # convert values to integers in range [0, 255]
+        item.setPen(QtGui.QPen(QtGui.QColor(R, G, B)))
+        item.setBrush(QtGui.QBrush(QtGui.QColor(R, G, B, 50)))
+        item.setData(0, 'preview_box')
+        self.scene.addItem(item)
 
 
 
