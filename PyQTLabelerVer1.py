@@ -184,18 +184,20 @@ class Ui_Dialog(object):
         self.annotated_bboxes = {}
         self.current_file = None
         self.current_class_id = '0'
+        self.selected_bbox = None
 
         # Connections
         self.cd_button.clicked.connect(self.load_image)
         self.comboBox.currentIndexChanged.connect(self.select_class)
         self.bbox_tbrowser.itemClicked.connect(self.item_clicked)
+        self.bbox_tbrowser.focusOutEvent = self.bbox_tbrowser_focus_out
 
         self.retranslateUi(Dialog)
         QtCore.QMetaObject.connectSlotsByName(Dialog)
 
     def retranslateUi(self, Dialog):
         _translate = QtCore.QCoreApplication.translate
-        Dialog.setWindowTitle(_translate("Dialog", "Dialog"))
+        Dialog.setWindowTitle(_translate("Dialog", "YOLO Labeler"))
         self.prev_button.setText(_translate("Dialog", "<< Prev"))
         self.next_button.setText(_translate("Dialog", "Next >>"))
         self.directory_label.setText(_translate("Dialog", "Directory"))
@@ -216,7 +218,6 @@ class Ui_Dialog(object):
         if self.current_file not in self.annotated_bboxes:
             self.annotated_bboxes[self.current_file] = {}
 
-        print(self.annotated_bboxes)
         # Load the image file as a pixmap
         self.graphicsView.scene().clear()
         pixmap = QPixmap(self.filename)
@@ -255,7 +256,6 @@ class Ui_Dialog(object):
         for key, value in self.annotated_bboxes[current_file].items():
             for bbox in value:
                 if bbox == except_bbox:
-                    print(bbox, except_bbox)
                     continue
                 x, y, w, h = bbox
                 rect = QtCore.QRectF(x, y, w, h)
@@ -275,9 +275,15 @@ class Ui_Dialog(object):
         s = item.text()
         tuple_str = re.search(r'\(([\d\.]+),\s*([\d\.]+),\s*([\d\.]+),\s*([\d\.]+)\)', s).group(1, 2, 3, 4)
         bbox = tuple(map(float, tuple_str))
+        self.selected_bbox = bbox
         highlight_class = s.split(' ')[0]
         self.redrawBoundingBoxExcept(self.current_file, bbox, highlight_class)
 
+    def bbox_tbrowser_focus_out(self, event):
+        for item in self.scene.items():
+            if isinstance(item, QtWidgets.QGraphicsRectItem):
+                self.scene.removeItem(item)
+        self.redrawBoundingBox(self.current_file)
 
 
 class MyDialog(QtWidgets.QDialog, Ui_Dialog):
@@ -298,6 +304,21 @@ class MyDialog(QtWidgets.QDialog, Ui_Dialog):
     def keyPressEvent(self, event):
         if event.key() == QtCore.Qt.Key_B:
             self.isDrawing = True
+            event.accept()  # accept the event to stop it from propagating to other widgets
+        elif event.key() == QtCore.Qt.Key_Delete:
+            for key, value in self.annotated_bboxes[self.current_file].items():
+                for bbox in value:
+                    if bbox == self.selected_bbox:
+                        self.annotated_bboxes[self.current_file][key].remove(bbox)
+                        bbox_to_remove = key + ' ' + str(bbox)
+                        for i in range(self.bbox_tbrowser.count()):
+                            if self.bbox_tbrowser.item(i).text() == bbox_to_remove:
+                                self.bbox_tbrowser.takeItem(i)
+                                break
+            for item in self.scene.items():
+                if isinstance(item, QtWidgets.QGraphicsRectItem):
+                    self.scene.removeItem(item)
+            self.redrawBoundingBox(self.current_file)
             event.accept()  # accept the event to stop it from propagating to other widgets
         else:
             super().keyPressEvent(event)  # call the base class method to handle other key press events
@@ -362,7 +383,6 @@ class MyDialog(QtWidgets.QDialog, Ui_Dialog):
 
                     # Create the tuple with (x, y, w, h) coordinates
                     bbox = (round(x, 2), round(y, 2), round(w, 2), round(h, 2))
-                    print(bbox)
                     self.drawBoundingBox()
                     if self.current_class_id not in self.annotated_bboxes[self.current_file]:
                         self.annotated_bboxes[self.current_file][self.current_class_id] = []
