@@ -127,13 +127,11 @@ class Ui_Dialog(object):
         self.graphicsView.setObjectName("graphicsView")
         self.scene = QGraphicsScene()
         self.graphicsView.setScene(self.scene)
-        # self.graphicsView.setDragMode(QtWidgets.QGraphicsView.ScrollHandDrag)
         self.graphicsView.setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOff)
         self.graphicsView.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOff)
         self.graphicsView.setRenderHint(QtGui.QPainter.Antialiasing)
         self.graphicsView.setRenderHint(QtGui.QPainter.SmoothPixmapTransform)
         self.graphicsView.setTransformationAnchor(QtWidgets.QGraphicsView.AnchorUnderMouse)
-        # self.graphicsView.setInteractive(True)
         self.horizontalLayoutWidget_2 = QtWidgets.QWidget(Dialog)
         self.horizontalLayoutWidget_2.setGeometry(QtCore.QRect(10, 0, 971, 31))
         self.horizontalLayoutWidget_2.setObjectName("horizontalLayoutWidget_2")
@@ -301,6 +299,8 @@ class MyDialog(QtWidgets.QDialog, Ui_Dialog):
         self.graphicsView.viewport().installEventFilter(self)
         self.graphicsView.setMouseTracking(True)  # add this line
         self.graphicsView.viewport().setCursor(QtCore.Qt.ArrowCursor)
+        shortcut = QtWidgets.QShortcut(QtGui.QKeySequence(QtCore.Qt.Key_Escape), self)
+        shortcut.activated.connect(self.handleEscape)
 
         # set the initial values for the bounding box
         self.startPos = None
@@ -311,6 +311,8 @@ class MyDialog(QtWidgets.QDialog, Ui_Dialog):
         self.ctrl_pressed = False
         self.last_mouse_pos = None
 
+    def handleEscape(self):
+        pass # Without doing this the GUI just closes whenever you press ESC
 
     def keyPressEvent(self, event):
         if event.key() == QtCore.Qt.Key_B:
@@ -485,7 +487,8 @@ class MyDialog(QtWidgets.QDialog, Ui_Dialog):
 if __name__ == "__main__":
     import sys
     app = QtWidgets.QApplication(sys.argv)
+    MainWindow = QtWidgets.QMainWindow()
     dialog = MyDialog()
+    dialog.setFocus()
     dialog.show()
-    sys.exit(app.exec_())
-
+    app.exec_()
