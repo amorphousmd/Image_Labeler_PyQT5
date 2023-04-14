@@ -127,6 +127,13 @@ class Ui_Dialog(object):
         self.graphicsView.setObjectName("graphicsView")
         self.scene = QGraphicsScene()
         self.graphicsView.setScene(self.scene)
+        self.graphicsView.setDragMode(QtWidgets.QGraphicsView.ScrollHandDrag)
+        self.graphicsView.setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOff)
+        self.graphicsView.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOff)
+        self.graphicsView.setRenderHint(QtGui.QPainter.Antialiasing)
+        self.graphicsView.setRenderHint(QtGui.QPainter.SmoothPixmapTransform)
+        self.graphicsView.setTransformationAnchor(QtWidgets.QGraphicsView.AnchorUnderMouse)
+        self.graphicsView.setInteractive(True)
         self.horizontalLayoutWidget_2 = QtWidgets.QWidget(Dialog)
         self.horizontalLayoutWidget_2.setGeometry(QtCore.QRect(10, 0, 971, 31))
         self.horizontalLayoutWidget_2.setObjectName("horizontalLayoutWidget_2")
@@ -185,6 +192,7 @@ class Ui_Dialog(object):
         self.current_file = None
         self.current_class_id = '0'
         self.selected_bbox = None
+        self.scale_factor = 1.0
 
         # Connections
         self.cd_button.clicked.connect(self.load_image)
@@ -292,6 +300,7 @@ class MyDialog(QtWidgets.QDialog, Ui_Dialog):
         self.setupUi(self)
         self.graphicsView.viewport().installEventFilter(self)
         self.graphicsView.setMouseTracking(True)  # add this line
+        self.graphicsView.viewport().setCursor(QtCore.Qt.ArrowCursor)
 
         # set the initial values for the bounding box
         self.startPos = None
@@ -299,6 +308,8 @@ class MyDialog(QtWidgets.QDialog, Ui_Dialog):
         self.drawnBox = False
         self.isDrawing = False
         self.dottedLines = []  # initialize a list to keep track of the dotted lines
+        self.ctrl_pressed = False
+        self.last_mouse_pos = None
 
 
     def keyPressEvent(self, event):
@@ -320,8 +331,20 @@ class MyDialog(QtWidgets.QDialog, Ui_Dialog):
                     self.scene.removeItem(item)
             self.redrawBoundingBox(self.current_file)
             event.accept()  # accept the event to stop it from propagating to other widgets
+        elif event.type() == QtCore.QEvent.KeyPress and event.key() == QtCore.Qt.Key_Control:
+            print('pressed')
+            self.ctrl_pressed = True
+            self.graphicsView.viewport().setCursor(QtCore.Qt.OpenHandCursor)
         else:
-            super().keyPressEvent(event)  # call the base class method to handle other key press events
+            super().keyPressEvent(event)
+
+    def keyReleaseEvent(self, event):
+        if event.key() == QtCore.Qt.Key_Control:
+            print('released')
+            self.ctrl_pressed = False
+            self.graphicsView.viewport().setCursor(QtCore.Qt.ArrowCursor)
+            event.accept()  # accept the event to stop it from propagating to other widgets
+
 
     def eventFilter(self, source, event):
         if event.type() == QtCore.QEvent.MouseMove:
@@ -361,9 +384,6 @@ class MyDialog(QtWidgets.QDialog, Ui_Dialog):
                 self.endPos = pos
                 self.drawBoundingBoxPreview()
 
-
-            return super(MyDialog, self).eventFilter(source, event)
-
         elif event.type() == QtCore.QEvent.MouseButtonPress and event.button() == QtCore.Qt.LeftButton:
             if self.isDrawing:
                 if not self.drawnBox:
@@ -395,6 +415,16 @@ class MyDialog(QtWidgets.QDialog, Ui_Dialog):
                     self.annotated_bboxes[self.current_file][self.current_class_id].append(bbox)
                     self.bbox_tbrowser.addItem(self.current_class_id + ' ' + str(bbox))
                     return True
+
+        if event.type() == QtCore.QEvent.Wheel and source is self.graphicsView.viewport():
+            if self.ctrl_pressed:
+                delta = event.angleDelta().y()
+                if delta > 0:
+                    self.scale_factor *= 1.2
+                elif delta < 0:
+                    self.scale_factor *= 1 / 1.2
+                self.graphicsView.setTransform(QtGui.QTransform().scale(self.scale_factor, self.scale_factor))
+                return True
 
         return super(MyDialog, self).eventFilter(source, event)
 
