@@ -127,13 +127,13 @@ class Ui_Dialog(object):
         self.graphicsView.setObjectName("graphicsView")
         self.scene = QGraphicsScene()
         self.graphicsView.setScene(self.scene)
-        self.graphicsView.setDragMode(QtWidgets.QGraphicsView.ScrollHandDrag)
+        # self.graphicsView.setDragMode(QtWidgets.QGraphicsView.ScrollHandDrag)
         self.graphicsView.setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOff)
         self.graphicsView.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOff)
         self.graphicsView.setRenderHint(QtGui.QPainter.Antialiasing)
         self.graphicsView.setRenderHint(QtGui.QPainter.SmoothPixmapTransform)
         self.graphicsView.setTransformationAnchor(QtWidgets.QGraphicsView.AnchorUnderMouse)
-        self.graphicsView.setInteractive(True)
+        # self.graphicsView.setInteractive(True)
         self.horizontalLayoutWidget_2 = QtWidgets.QWidget(Dialog)
         self.horizontalLayoutWidget_2.setGeometry(QtCore.QRect(10, 0, 971, 31))
         self.horizontalLayoutWidget_2.setObjectName("horizontalLayoutWidget_2")
@@ -383,6 +383,23 @@ class MyDialog(QtWidgets.QDialog, Ui_Dialog):
                 pos = self.graphicsView.mapToScene(event.pos())
                 self.endPos = pos
                 self.drawBoundingBoxPreview()
+
+            if event.buttons() == QtCore.Qt.LeftButton and self.ctrl_pressed:
+                cursor = QtGui.QCursor()
+                if self.last_mouse_pos is None:
+                    self.last_mouse_pos = cursor.pos()
+                    return True
+                delta = cursor.pos() - self.last_mouse_pos
+                self.last_mouse_pos = cursor.pos()
+                dx = delta.x()
+                dy = delta.y()
+                self.graphicsView.horizontalScrollBar().setValue(self.graphicsView.horizontalScrollBar().value() - dx)
+                self.graphicsView.verticalScrollBar().setValue(self.graphicsView.verticalScrollBar().value() - dy)
+                return True
+        elif event.type() == QtCore.QEvent.MouseButtonRelease and event.button() == QtCore.Qt.LeftButton and event.modifiers() == QtCore.Qt.ControlModifier:
+            self.last_mouse_pos = None
+            return True
+
 
         elif event.type() == QtCore.QEvent.MouseButtonPress and event.button() == QtCore.Qt.LeftButton:
             if self.isDrawing:
