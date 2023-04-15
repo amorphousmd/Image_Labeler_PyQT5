@@ -1,6 +1,5 @@
 # -*- coding: utf-8 -*-
 
-# Form implementation generated from reading ui file 'PyQTLabelerVer1.ui'
 #
 # Created by: PyQt5 UI code generator 5.15.9
 #
@@ -108,7 +107,7 @@ _COLORS = np.array(
 class Ui_Dialog(QtWidgets.QDialog):
     def __init__(self):
         super().__init__()
-        uic.loadUi('PyQTLabelerVer1.ui', self)
+        uic.loadUi('GUIDesign.ui', self)
         self.scene = QGraphicsScene()
         self.graphicsView.setScene(self.scene)
         self.graphicsView.setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOff)
@@ -471,6 +470,7 @@ class Ui_Dialog(QtWidgets.QDialog):
                 if not self.drawnBox:
                     # start drawing
                     pos = self.graphicsView.mapToScene(event.pos())
+                    print(pos)
                     self.startPos = pos
                     self.endPos = pos
                     self.drawnBox = True
@@ -478,6 +478,7 @@ class Ui_Dialog(QtWidgets.QDialog):
                 else:
                     # finish drawing
                     pos = self.graphicsView.mapToScene(event.pos())
+                    print(pos)
                     self.endPos = pos
                     self.drawnBox = False
                     self.isDrawing = False
