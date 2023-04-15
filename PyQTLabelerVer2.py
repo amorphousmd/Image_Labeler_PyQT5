@@ -103,6 +103,8 @@ _COLORS = np.array(
         0.50, 0.5, 0
     ]
 ).astype(np.float32).reshape(-1, 3)
+
+
 class Ui_Dialog(QtWidgets.QDialog):
     def __init__(self):
         super().__init__()
@@ -127,7 +129,9 @@ class Ui_Dialog(QtWidgets.QDialog):
         # Set up general variables that are used for keeping track of annotated images
         self.image_loaded = False
         self.annotated_bboxes = {}
+        self.filename = None
         self.current_file = None
+        self.current_dir = None
         self.current_class_id = '0'
         self.selected_bbox = None
         self.scale_factor = 1.0
@@ -139,7 +143,10 @@ class Ui_Dialog(QtWidgets.QDialog):
         self.bbox_tbrowser.focusOutEvent = self.bbox_tbrowser_focus_out
         self.finish_button.clicked.connect(self.save_annotations)
         self.load_annotate_button.clicked.connect(self.load_annotations)
-        # self.finish_button.clicked.connect()
+        self.prev_button.clicked.connect(self.load_prev)
+        self.next_button.clicked.connect(self.load_next)
+        self.goto_button.clicked.connect(self.goto_index)
+        self.dir_change_button.clicked.connect(self.change_directory)
 
         QtCore.QMetaObject.connectSlotsByName(Dialog)
         self.graphicsView.viewport().installEventFilter(self)
@@ -148,7 +155,7 @@ class Ui_Dialog(QtWidgets.QDialog):
         shortcut = QtWidgets.QShortcut(QtGui.QKeySequence(QtCore.Qt.Key_Escape), self)
         shortcut.activated.connect(self.handleEscape)
 
-        # set the initial values for the bounding box
+        # Setup the values for action handling
         self.startPos = None
         self.endPos = None
         self.drawnBox = False
@@ -156,9 +163,8 @@ class Ui_Dialog(QtWidgets.QDialog):
         self.dottedLines = []  # initialize a list to keep track of the dotted lines
         self.ctrl_pressed = False
         self.last_mouse_pos = None
-
         self.graphicsView.viewport().installEventFilter(self)
-        self.graphicsView.setMouseTracking(True)  # add this line
+        self.graphicsView.setMouseTracking(True)
         self.graphicsView.viewport().setCursor(QtCore.Qt.ArrowCursor)
         shortcut = QtWidgets.QShortcut(QtGui.QKeySequence(QtCore.Qt.Key_Escape), self)
         shortcut.activated.connect(self.handleEscape)
@@ -174,9 +180,12 @@ class Ui_Dialog(QtWidgets.QDialog):
         if not self.filename:
             return
         self.current_file = str(os.path.basename(self.filename))
+        self.current_dir = str(os.path.dirname(self.filename))
         if self.current_file not in self.annotated_bboxes:
             self.annotated_bboxes[self.current_file] = {}
 
+        self.image_label.setText(self.current_file)
+        self.directory_tbrowser.setText(self.current_dir)
         # Load the image file as a pixmap
         self.graphicsView.scene().clear()
         pixmap = QPixmap(self.filename)
@@ -191,21 +200,106 @@ class Ui_Dialog(QtWidgets.QDialog):
         self.rewrite_bbox_list(self.current_file)
         self.image_loaded = True
 
+    def load_image_nopath(self, name):
+        for line in self.dottedLines:
+            self.graphicsView.scene().removeItem(line)
+        self.dottedLines = []
+        # Get the path to the image file using a file dialog
+        self.filename = self.current_dir + '/' + name
+        if not self.filename:
+            return
+        self.current_file = str(os.path.basename(self.filename))
+        self.current_dir = str(os.path.dirname(self.filename))
+        if self.current_file not in self.annotated_bboxes:
+            self.annotated_bboxes[self.current_file] = {}
+
+        self.image_label.setText(self.current_file)
+        self.directory_tbrowser.setText(self.current_dir)
+        # Load the image file as a pixmap
+        self.graphicsView.scene().clear()
+        pixmap = QPixmap(self.filename)
+        if pixmap.isNull():
+            return
+        # Set the pixmap as the background for the QGraphicsView widget
+        self.scene.clear()
+        self.scene.addPixmap(pixmap)
+        self.graphicsView.setSceneRect(QRectF(pixmap.rect()))
+        self.graphicsView.fitInView(QRectF(pixmap.rect()), Qt.KeepAspectRatio)
+        self.redrawBoundingBox(self.current_file)
+        self.rewrite_bbox_list(self.current_file)
+        self.image_loaded = True
+
+    def change_directory(self):
+        options = QFileDialog.Options()
+        options |= QFileDialog.DontUseNativeDialog
+        current_dir = os.getcwd()
+        folder_path = QFileDialog.getExistingDirectory(self, "Select Folder", current_dir, options=options)
+        self.current_dir = folder_path
+        files = sorted([f for f in os.listdir(self.current_dir) if f.endswith('.jpg') or f.endswith('.png')])
+        self.load_image_nopath(files[0])
+
+    def load_next(self):
+        parent_dir = self.current_dir
+        file = self.current_file
+        if file is None or parent_dir is None:
+            return
+        files = sorted([f for f in os.listdir(parent_dir) if f.endswith('.jpg') or f.endswith('.png')])
+        current_index = files.index(file)
+        if current_index == len(files) - 1:
+            return None  # reached end of list
+        else:
+            self.load_image_nopath(files[current_index + 1])
+            return files[current_index + 1]
+
+    def load_prev(self):
+        parent_dir = self.current_dir
+        file = self.current_file
+        if file is None or parent_dir is None:
+            return
+        files = sorted([f for f in os.listdir(parent_dir) if f.endswith('.jpg') or f.endswith('.png')])
+        current_index = files.index(file)
+        if current_index == 0:
+            return None  # reached beginning of list
+        else:
+            self.load_image_nopath(files[current_index - 1])
+            return files[current_index - 1]
+
+    def goto_index(self):
+        parent_dir = self.current_dir
+        file = self.current_file
+        if file is None or parent_dir is None:
+            return
+        files = sorted([f for f in os.listdir(parent_dir) if f.endswith('.jpg') or f.endswith('.png')])
+        index_str = self.index_ledit.text()  # Get the text from the line edit
+        try:
+            index = int(index_str)  # Convert the text to an integer
+        except ValueError:
+            return  # If the text cannot be converted to an integer, do nothing
+        if index < 0:
+            index = 0  # If the index is negative, set it to 0
+        elif index > len(files) - 1:
+            index = len(files) - 1  # If the index is greater than the maximum index, set it to the maximum index
+        self.load_image_nopath(files[index])
+
+
     def select_class(self, i):
         self.current_class_id = str(i)
         print("Current class:", i)
 
     def redrawBoundingBox(self, current_file):
         # iterate over each image file in the dictionary
-        for key, value in self.annotated_bboxes[current_file].items():
-            for bbox in value:
-                x, y, w, h = bbox
-                rect = QtCore.QRectF(x, y, w, h)
-                item = QtWidgets.QGraphicsRectItem(rect)
-                R, G, B = [int(i * 255) for i in _COLORS[int(key)]]
-                item.setPen(QtGui.QPen(QtGui.QColor(R, G, B)))
-                item.setBrush(QtGui.QBrush(QtGui.QColor(R, G, B, 50)))
-                self.scene.addItem(item)
+        try:
+            for key, value in self.annotated_bboxes[current_file].items():
+                for bbox in value:
+                    x, y, w, h = bbox
+                    rect = QtCore.QRectF(x, y, w, h)
+                    item = QtWidgets.QGraphicsRectItem(rect)
+                    R, G, B = [int(i * 255) for i in _COLORS[int(key)]]
+                    item.setPen(QtGui.QPen(QtGui.QColor(R, G, B)))
+                    item.setBrush(QtGui.QBrush(QtGui.QColor(R, G, B, 50)))
+                    self.scene.addItem(item)
+        except KeyError:
+            return
 
     def redrawBoundingBoxExcept(self, current_file, except_bbox, highlight_class):
         for item in self.scene.items():
@@ -451,192 +545,6 @@ class Ui_Dialog(QtWidgets.QDialog):
         item.setData(0, 'preview_box')
         self.scene.addItem(item)
 
-# class MyDialog(Ui_Dialog):
-#     def __init__(self, parent=None):
-#         super(MyDialog, self).__init__()
-#         uic.loadUi("PyQTLabelerVer1.ui", self)
-#         self.graphicsView.viewport().installEventFilter(self)
-#         self.graphicsView.setMouseTracking(True)  # add this line
-#         self.graphicsView.viewport().setCursor(QtCore.Qt.ArrowCursor)
-#         shortcut = QtWidgets.QShortcut(QtGui.QKeySequence(QtCore.Qt.Key_Escape), self)
-#         shortcut.activated.connect(self.handleEscape)
-#
-#         # set the initial values for the bounding box
-#         self.startPos = None
-#         self.endPos = None
-#         self.drawnBox = False
-#         self.isDrawing = False
-#         self.dottedLines = []  # initialize a list to keep track of the dotted lines
-#         self.ctrl_pressed = False
-#         self.last_mouse_pos = None
-#
-#     def handleEscape(self):
-#         pass  # Without doing this the GUI just closes whenever you press ESC
-#
-#     def keyPressEvent(self, event):
-#         if event.key() == QtCore.Qt.Key_B:
-#             self.isDrawing = True
-#             event.accept()  # accept the event to stop it from propagating to other widgets
-#         elif event.key() == QtCore.Qt.Key_Delete:
-#             for key, value in self.annotated_bboxes[self.current_file].items():
-#                 for bbox in value:
-#                     if bbox == self.selected_bbox:
-#                         self.annotated_bboxes[self.current_file][key].remove(bbox)
-#                         bbox_to_remove = key + ' ' + str(bbox)
-#                         for i in range(self.bbox_tbrowser.count()):
-#                             if self.bbox_tbrowser.item(i).text() == bbox_to_remove:
-#                                 self.bbox_tbrowser.takeItem(i)
-#                                 break
-#             for item in self.scene.items():
-#                 if isinstance(item, QtWidgets.QGraphicsRectItem):
-#                     self.scene.removeItem(item)
-#             self.redrawBoundingBox(self.current_file)
-#             event.accept()  # accept the event to stop it from propagating to other widgets
-#         elif event.type() == QtCore.QEvent.KeyPress and event.key() == QtCore.Qt.Key_Control:
-#             self.ctrl_pressed = True
-#             self.graphicsView.viewport().setCursor(QtCore.Qt.OpenHandCursor)
-#         else:
-#             super().keyPressEvent(event)
-#
-#     def keyReleaseEvent(self, event):
-#         if event.key() == QtCore.Qt.Key_Control:
-#             self.ctrl_pressed = False
-#             self.graphicsView.viewport().setCursor(QtCore.Qt.ArrowCursor)
-#             event.accept()  # accept the event to stop it from propagating to other widgets
-#
-#     def eventFilter(self, source, event):
-#         if event.type() == QtCore.QEvent.MouseMove:
-#             if not self.image_loaded:
-#                 return super(Ui_Dialog, self).eventFilter(source, event)
-#             # get the position of the mouse cursor in the scene coordinates
-#             scenePos = self.graphicsView.mapToScene(event.pos())
-#
-#             # get the rectangle of the visible area in the view coordinates
-#             viewRect = self.graphicsView.viewport().rect()
-#
-#             # clear any existing dotted lines
-#             try:
-#                 for line in self.dottedLines:
-#                     self.graphicsView.scene().removeItem(line)
-#                 self.dottedLines = []
-#             except RuntimeError:
-#                 return super(Ui_Dialog, self).eventFilter(source, event)
-#
-#             # create a QPen object for the dotted line
-#             dottedLinePen = QtGui.QPen(QtCore.Qt.DotLine)
-#             dottedLinePen.setWidth(1)
-#
-#             # add horizontal and vertical dotted lines intersecting at the cursor position
-#             horizLine = QtWidgets.QGraphicsLineItem(viewRect.left(), scenePos.y(), viewRect.right(), scenePos.y())
-#             horizLine.setPen(dottedLinePen)
-#             self.graphicsView.scene().addItem(horizLine)
-#             self.dottedLines.append(horizLine)
-#
-#             vertLine = QtWidgets.QGraphicsLineItem(scenePos.x(), viewRect.top(), scenePos.x(), viewRect.bottom())
-#             vertLine.setPen(dottedLinePen)
-#             self.graphicsView.scene().addItem(vertLine)
-#             self.dottedLines.append(vertLine)
-#
-#             if self.drawnBox:
-#                 pos = self.graphicsView.mapToScene(event.pos())
-#                 self.endPos = pos
-#                 self.drawBoundingBoxPreview()
-#
-#             if event.buttons() == QtCore.Qt.LeftButton and self.ctrl_pressed:
-#                 cursor = QtGui.QCursor()
-#                 if self.last_mouse_pos is None:
-#                     self.last_mouse_pos = cursor.pos()
-#                     return True
-#                 delta = cursor.pos() - self.last_mouse_pos
-#                 self.last_mouse_pos = cursor.pos()
-#                 dx = delta.x()
-#                 dy = delta.y()
-#                 self.graphicsView.horizontalScrollBar().setValue(self.graphicsView.horizontalScrollBar().value() - dx)
-#                 self.graphicsView.verticalScrollBar().setValue(self.graphicsView.verticalScrollBar().value() - dy)
-#                 return True
-#         elif event.type() == QtCore.QEvent.MouseButtonRelease and event.button() == QtCore.Qt.LeftButton and \
-#                 event.modifiers() == QtCore.Qt.ControlModifier:
-#             self.last_mouse_pos = None
-#             return True
-#
-#         elif event.type() == QtCore.QEvent.MouseButtonPress and event.button() == QtCore.Qt.LeftButton:
-#             if self.isDrawing:
-#                 if not self.drawnBox:
-#                     # start drawing
-#                     pos = self.graphicsView.mapToScene(event.pos())
-#                     self.startPos = pos
-#                     self.endPos = pos
-#                     self.drawnBox = True
-#                     return True
-#                 else:
-#                     # finish drawing
-#                     pos = self.graphicsView.mapToScene(event.pos())
-#                     self.endPos = pos
-#                     self.drawnBox = False
-#                     self.isDrawing = False
-#                     # Get the x and y coordinates of the upper left corner of the bounding box
-#                     x = min(self.startPos.x(), self.endPos.x())
-#                     y = min(self.startPos.y(), self.endPos.y())
-#
-#                     # Get the width and height of the bounding box
-#                     w = abs(self.startPos.x() - self.endPos.x())
-#                     h = abs(self.startPos.y() - self.endPos.y())
-#
-#                     # Create the tuple with (x, y, w, h) coordinates
-#                     bbox = (round(x, 2), round(y, 2), round(w, 2), round(h, 2))
-#                     self.drawBoundingBox()
-#                     if self.current_class_id not in self.annotated_bboxes[self.current_file]:
-#                         self.annotated_bboxes[self.current_file][self.current_class_id] = []
-#                     self.annotated_bboxes[self.current_file][self.current_class_id].append(bbox)
-#                     self.bbox_tbrowser.addItem(self.current_class_id + ' ' + str(bbox))
-#                     return True
-#
-#         if event.type() == QtCore.QEvent.Wheel and source is self.graphicsView.viewport():
-#             if self.ctrl_pressed:
-#                 delta = event.angleDelta().y()
-#                 if delta > 0:
-#                     self.scale_factor *= 1.2
-#                 elif delta < 0:
-#                     self.scale_factor *= 1 / 1.2
-#                 self.graphicsView.setTransform(QtGui.QTransform().scale(self.scale_factor, self.scale_factor))
-#                 return True
-#
-#         return super(Ui_Dialog, self).eventFilter(source, event)
-#
-#     def drawBoundingBox(self):
-#         # create a QGraphicsRectItem to represent the bounding box
-#         items = self.scene.items()
-#         # Iterate through the list to find the item you're looking for
-#         for item in items:
-#             if isinstance(item, QtWidgets.QGraphicsRectItem) and item.data(0) == 'preview_box':
-#                 self.scene.removeItem(item)
-#         rect = QtCore.QRectF(self.startPos, self.endPos)
-#         item = QtWidgets.QGraphicsRectItem(rect)
-#         # Grabbing the colors from indices
-#         R, G, B = [int(i * 255) for i in _COLORS[int(self.current_class_id)]]
-#         item.setPen(QtGui.QPen(QtGui.QColor(R, G, B)))
-#         item.setBrush(QtGui.QBrush(QtGui.QColor(R, G, B, 50)))
-#         self.scene.addItem(item)
-#         self.startPos = None
-#         self.endPos = None
-#         self.drawnBox = False
-#
-#     def drawBoundingBoxPreview(self):
-#         items = self.scene.items()
-#
-#         # Iterate through the list to find the item you're looking for
-#         for item in items:
-#             if isinstance(item, QtWidgets.QGraphicsRectItem) and item.data(0) == 'preview_box':
-#                 self.scene.removeItem(item)
-#         # create a QGraphicsRectItem to represent the bounding box
-#         rect = QtCore.QRectF(self.startPos, self.endPos)
-#         item = QtWidgets.QGraphicsRectItem(rect)
-#         R, G, B = [int(i * 255) for i in
-#                    _COLORS[int(self.current_class_id)]]  # convert values to integers in range [0, 255]
-#         item.setPen(QtGui.QPen(QtGui.QColor(R, G, B)))
-#         item.setBrush(QtGui.QBrush(QtGui.QColor(R, G, B, 50)))
-#         item.setData(0, 'preview_box')
-#         self.scene.addItem(item)
 
 if __name__ == "__main__":
     import sys
