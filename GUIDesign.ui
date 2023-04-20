@@ -23,7 +23,7 @@
     </rect>
    </property>
    <property name="currentIndex">
-    <number>0</number>
+    <number>1</number>
    </property>
    <widget class="QWidget" name="tab">
     <attribute name="title">
@@ -68,7 +68,7 @@
        <x>10</x>
        <y>0</y>
        <width>971</width>
-       <height>31</height>
+       <height>89</height>
       </rect>
      </property>
      <layout class="QHBoxLayout" name="horizontalLayout_2">
@@ -232,30 +232,30 @@
        </widget>
       </item>
       <item>
-       <widget class="QRadioButton" name="radioButton">
+       <widget class="QCheckBox" name="hflip_checkbox">
         <property name="text">
          <string>Horizontal Flip</string>
         </property>
        </widget>
       </item>
       <item>
-       <widget class="QRadioButton" name="radioButton_2">
+       <widget class="QCheckBox" name="vflip_checkbox">
         <property name="text">
-         <string>Verical Flip</string>
+         <string>Vertical Flip</string>
         </property>
        </widget>
       </item>
       <item>
-       <widget class="QRadioButton" name="radioButton_3">
-        <property name="text">
-         <string>Brightness Change</string>
-        </property>
-       </widget>
-      </item>
-      <item>
-       <widget class="QRadioButton" name="radioButton_4">
+       <widget class="QCheckBox" name="noises_checkbox">
         <property name="text">
          <string>Noises</string>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QCheckBox" name="brightness_checkbox">
+        <property name="text">
+         <string>Brightness Change</string>
         </property>
        </widget>
       </item>
@@ -342,7 +342,7 @@
       </item>
      </layout>
     </widget>
-    <widget class="QPushButton" name="pushButton_2">
+    <widget class="QPushButton" name="export_button">
      <property name="geometry">
       <rect>
        <x>50</x>

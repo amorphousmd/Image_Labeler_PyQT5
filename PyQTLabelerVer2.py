@@ -11,6 +11,9 @@ import os
 import numpy as np
 import re
 import json
+import random
+import cv2
+from PIL import Image
 
 from PyQt5 import QtCore, QtGui, QtWidgets, uic
 from PyQt5.QtGui import QPixmap
@@ -146,6 +149,7 @@ class Ui_Dialog(QtWidgets.QDialog):
         self.next_button.clicked.connect(self.load_next)
         self.goto_button.clicked.connect(self.goto_index)
         self.dir_change_button.clicked.connect(self.change_directory)
+        self.export_button.clicked.connect(self.export)
 
         QtCore.QMetaObject.connectSlotsByName(Dialog)
         self.graphicsView.viewport().installEventFilter(self)
@@ -546,6 +550,60 @@ class Ui_Dialog(QtWidgets.QDialog):
         item.setData(0, 'preview_box')
         self.scene.addItem(item)
 
+    def export(self):
+        prob = 0.02
+        brightness_range = [-50, 50]
+        # set the input and output folder paths
+        input_folder = "./Images"
+        output_folder = "./AugmentedImages"
+
+        # loop over all the files in the input folder
+        for filename in os.listdir(input_folder):
+            # check if the file is an image
+            if filename.endswith(".jpg"):
+                # open the image
+                image_path = os.path.join(input_folder, filename)
+                image = Image.open(image_path)
+
+                # Horizontal Flip
+                if self.hflip_checkbox.isChecked():
+                    hflipped_image = image.transpose(Image.FLIP_LEFT_RIGHT)
+                    output_filename = os.path.splitext(filename)[0] + '_hflipped.jpg'
+                    output_path = os.path.join(output_folder, output_filename)
+                    hflipped_image.save(output_path)
+
+                # Vertical flip
+                if self.vflip_checkbox.isChecked():
+                    vflipped_image = image.transpose(Image.FLIP_TOP_BOTTOM)
+                    output_filename = os.path.splitext(filename)[0] + '_vflipped.jpg'
+                    output_path = os.path.join(output_folder, output_filename)
+                    vflipped_image.save(output_path)
+
+                if self.noises_checkbox.isChecked():
+                    # add noise to the image
+
+                    image = cv2.imread(os.path.join("./Images", filename))
+
+                    # Generate mask of pixels to set to white
+                    mask = np.random.rand(*image.shape[:2]) < prob
+
+                    # Set pixels to white
+                    image[mask, :] = [255, 255, 255]
+
+                    # Save noisy image
+                    cv2.imwrite(os.path.join("./AugmentedImages", os.path.splitext(filename)[0]) + '_noises.jpg', image)
+
+                # randomly adjust the brightness
+                if self.brightness_checkbox.isChecked():
+                    image_path = os.path.join(input_folder, filename)
+                    image = Image.open(image_path)
+                    brightness = random.randint(brightness_range[0], brightness_range[1])
+                    adjusted_image = Image.eval(image, lambda x: x + brightness)
+
+                    # save the adjusted image
+                    output_filename = os.path.splitext(filename)[0] + "_brchgd" + ".jpg"
+                    output_path = os.path.join(output_folder, output_filename)
+                    adjusted_image.save(output_path)
 
 if __name__ == "__main__":
     import sys
