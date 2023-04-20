@@ -13,6 +13,7 @@ import re
 import json
 import random
 import cv2
+import copy
 from PIL import Image
 
 from PyQt5 import QtCore, QtGui, QtWidgets, uic
@@ -131,6 +132,7 @@ class Ui_Dialog(QtWidgets.QDialog):
         # Set up general variables that are used for keeping track of annotated images
         self.image_loaded = False
         self.annotated_bboxes = {}
+        self.annotated_bboxes_noaug = {}
         self.filename = None
         self.current_file = None
         self.current_dir = None
@@ -552,8 +554,9 @@ class Ui_Dialog(QtWidgets.QDialog):
 
     def export(self):
         prob = 0.02
-        brightness_range = [-50, 50]
+        brightness_range = [-100, 100]
         # set the input and output folder paths
+        self.annotated_bboxes_noaug = copy.deepcopy(self.annotated_bboxes)
         input_folder = "./Images"
         output_folder = "./AugmentedImages"
 
@@ -564,6 +567,7 @@ class Ui_Dialog(QtWidgets.QDialog):
                 # open the image
                 image_path = os.path.join(input_folder, filename)
                 image = Image.open(image_path)
+                print(image.size)
 
                 # Horizontal Flip
                 if self.hflip_checkbox.isChecked():
@@ -593,6 +597,7 @@ class Ui_Dialog(QtWidgets.QDialog):
                     # Save noisy image
                     cv2.imwrite(os.path.join("./AugmentedImages", os.path.splitext(filename)[0]) + '_noises.jpg', image)
 
+
                 # randomly adjust the brightness
                 if self.brightness_checkbox.isChecked():
                     image_path = os.path.join(input_folder, filename)
@@ -604,6 +609,74 @@ class Ui_Dialog(QtWidgets.QDialog):
                     output_filename = os.path.splitext(filename)[0] + "_brchgd" + ".jpg"
                     output_path = os.path.join(output_folder, output_filename)
                     adjusted_image.save(output_path)
+
+        if self.hflip_checkbox.isChecked():
+            new_dict_data = {}
+
+            for key, value in self.annotated_bboxes_noaug.items():
+                new_key = key.split(".")[0] + "_hflipped.jpg"
+                new_value = {}
+                image_path = os.path.join(output_folder, new_key)
+                image = Image.open(image_path)
+                image_width = image.width
+                for inner_key, inner_value in value.items():
+                    new_inner_value = []
+                    for bbox in inner_value:
+                        x, y, w, h = bbox
+                        new_x = image_width - x - w
+                        new_inner_value.append((new_x, y, w, h))
+                    new_value[inner_key] = new_inner_value
+                new_dict_data[new_key] = new_value
+            self.annotated_bboxes.update(new_dict_data)
+
+        if self.vflip_checkbox.isChecked():
+            print(self.annotated_bboxes_noaug.items())
+            new_dict_data = {}
+            for key, value in self.annotated_bboxes_noaug.items():
+                new_key = key.split(".")[0] + "_vflipped.jpg"
+                new_value = {}
+                image_path = os.path.join(output_folder, new_key)
+                image = Image.open(image_path)
+                image_height = image.height
+                for inner_key, inner_value in value.items():
+                    new_inner_value = []
+                    for bbox in inner_value:
+                        x, y, w, h = bbox
+                        new_y = image_height - y - h
+                        new_inner_value.append((x, new_y, w, h))
+                    new_value[inner_key] = new_inner_value
+                new_dict_data[new_key] = new_value
+            self.annotated_bboxes.update(new_dict_data)
+
+        if self.noises_checkbox.isChecked():
+            # make a copy of the original dictionary
+            new_dict_data = copy.deepcopy(self.annotated_bboxes)
+
+            for key, value in self.annotated_bboxes.items():
+                # check if the key ends with ".jpg"
+                if key.endswith(".jpg"):
+                    # get the new key name with "_noises.jpg" appended to it
+                    new_key = key.split(".jpg")[0] + "_noises.jpg"
+                    # set the value of the new key to be the same as the original key
+                    new_dict_data[new_key] = self.annotated_bboxes[key]
+
+            # concatenate the new dictionary with the original one
+            self.annotated_bboxes.update(new_dict_data)
+
+        if self.brightness_checkbox.isChecked():
+            # make a copy of the original dictionary
+            new_dict_data = copy.deepcopy(self.annotated_bboxes)
+
+            for key, value in self.annotated_bboxes.items():
+                # check if the key ends with ".jpg"
+                if key.endswith(".jpg"):
+                    # get the new key name with "_noises.jpg" appended to it
+                    new_key = key.split(".jpg")[0] + "_brchgd.jpg"
+                    # set the value of the new key to be the same as the original key
+                    new_dict_data[new_key] = self.annotated_bboxes[key]
+
+            # concatenate the new dictionary with the original one
+            self.annotated_bboxes.update(new_dict_data)
 
 if __name__ == "__main__":
     import sys
