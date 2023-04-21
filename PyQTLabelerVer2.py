@@ -14,6 +14,7 @@ import json
 import random
 import cv2
 import copy
+import math
 from PIL import Image
 
 from PyQt5 import QtCore, QtGui, QtWidgets, uic
@@ -133,12 +134,15 @@ class Ui_Dialog(QtWidgets.QDialog):
         self.image_loaded = False
         self.annotated_bboxes = {}
         self.annotated_bboxes_noaug = {}
+        self.dataset_metadata = {}
         self.filename = None
         self.current_file = None
         self.current_dir = None
         self.current_class_id = '0'
         self.selected_bbox = None
         self.scale_factor = 1.0
+        self.tvt_split_ratio = 0.8
+        self.vt_split_ratio = 0.5
 
         # Connections
         self.cd_button.clicked.connect(self.load_image)
@@ -152,6 +156,9 @@ class Ui_Dialog(QtWidgets.QDialog):
         self.goto_button.clicked.connect(self.goto_index)
         self.dir_change_button.clicked.connect(self.change_directory)
         self.export_button.clicked.connect(self.export)
+        self.tvt_slider.valueChanged.connect(lambda value: self.tvt_label.setText(str(value)))
+        self.vt_slider.valueChanged.connect(lambda value: self.vt_label.setText(str(value)))
+        self.test_button.clicked.connect(self.test_function)
 
         QtCore.QMetaObject.connectSlotsByName(Dialog)
         self.graphicsView.viewport().installEventFilter(self)
@@ -176,6 +183,7 @@ class Ui_Dialog(QtWidgets.QDialog):
 
     def load_image(self):
         print(self.annotated_bboxes)
+        print(self.dataset_metadata)
         for line in self.dottedLines:
             self.graphicsView.scene().removeItem(line)
         self.dottedLines = []
@@ -188,6 +196,8 @@ class Ui_Dialog(QtWidgets.QDialog):
         self.current_dir = str(os.path.dirname(self.filename))
         if self.current_file not in self.annotated_bboxes:
             self.annotated_bboxes[self.current_file] = {}
+        if self.current_file not in self.dataset_metadata:
+            self.dataset_metadata[self.current_file] = {}
 
         self.image_label.setText(self.current_file)
         self.directory_tbrowser.setText(self.current_dir)
@@ -196,6 +206,7 @@ class Ui_Dialog(QtWidgets.QDialog):
         pixmap = QPixmap(self.filename)
         if pixmap.isNull():
             return
+        self.dataset_metadata[self.current_file]['_size'] = [pixmap.width(), pixmap.height()]
         # Set the pixmap as the background for the QGraphicsView widget
         self.scene.clear()
         self.scene.addPixmap(pixmap)
@@ -630,7 +641,6 @@ class Ui_Dialog(QtWidgets.QDialog):
             self.annotated_bboxes.update(new_dict_data)
 
         if self.vflip_checkbox.isChecked():
-            print(self.annotated_bboxes_noaug.items())
             new_dict_data = {}
             for key, value in self.annotated_bboxes_noaug.items():
                 new_key = key.split(".")[0] + "_vflipped.jpg"
@@ -677,6 +687,29 @@ class Ui_Dialog(QtWidgets.QDialog):
 
             # concatenate the new dictionary with the original one
             self.annotated_bboxes.update(new_dict_data)
+
+    def test_function(self):
+        folder_path = "./TestFolder"  # replace with the path to your folder
+
+        jpg_count = 0
+        for filename in os.listdir(folder_path):
+            if filename.endswith(".jpg"):
+                jpg_count += 1
+
+        self.total_imgs_label.setText(str(jpg_count))
+        if self.tvt_slider.value() != 0:
+            self.tvt_split_ratio = self.tvt_slider.value() / 100
+        if self.vt_slider.value() != 0:
+            self.vt_split_ratio = self.vt_slider.value() / 100
+
+        num_train_imgs = math.ceil(jpg_count * self.tvt_split_ratio)
+        num_valtest_imgs = jpg_count - num_train_imgs
+        num_val_imgs = math.ceil(num_valtest_imgs * self.vt_split_ratio)
+        num_test_imgs = num_valtest_imgs - num_val_imgs
+        self.train_imgs_label.setText(str(num_train_imgs))
+        self.val_imgs_label.setText(str(num_val_imgs))
+        self.test_imgs_label.setText(str(num_test_imgs))
+
 
 if __name__ == "__main__":
     import sys

@@ -178,14 +178,20 @@
        </widget>
       </item>
       <item row="1" column="1">
-       <widget class="QSlider" name="horizontalSlider_2">
+       <widget class="QSlider" name="vt_slider">
+        <property name="maximum">
+         <number>100</number>
+        </property>
         <property name="orientation">
          <enum>Qt::Horizontal</enum>
         </property>
        </widget>
       </item>
       <item row="0" column="1">
-       <widget class="QSlider" name="horizontalSlider">
+       <widget class="QSlider" name="tvt_slider">
+        <property name="maximum">
+         <number>100</number>
+        </property>
         <property name="orientation">
          <enum>Qt::Horizontal</enum>
         </property>
@@ -199,16 +205,16 @@
        </widget>
       </item>
       <item row="1" column="2">
-       <widget class="QLabel" name="label_5">
+       <widget class="QLabel" name="vt_label">
         <property name="text">
-         <string>TextLabel</string>
+         <string>0</string>
         </property>
        </widget>
       </item>
       <item row="0" column="2">
-       <widget class="QLabel" name="label_6">
+       <widget class="QLabel" name="tvt_label">
         <property name="text">
-         <string>TextLabel</string>
+         <string>0</string>
         </property>
        </widget>
       </item>
@@ -218,7 +224,7 @@
      <property name="geometry">
       <rect>
        <x>20</x>
-       <y>120</y>
+       <y>290</y>
        <width>160</width>
        <height>126</height>
       </rect>
@@ -353,6 +359,99 @@
      </property>
      <property name="text">
       <string>Export</string>
+     </property>
+    </widget>
+    <widget class="QWidget" name="horizontalLayoutWidget_4">
+     <property name="geometry">
+      <rect>
+       <x>20</x>
+       <y>140</y>
+       <width>311</width>
+       <height>41</height>
+      </rect>
+     </property>
+     <layout class="QHBoxLayout" name="horizontalLayout_4">
+      <item>
+       <widget class="QLabel" name="label_4">
+        <property name="text">
+         <string>Train:</string>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QLabel" name="train_imgs_label">
+        <property name="text">
+         <string>0</string>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QLabel" name="label_5">
+        <property name="text">
+         <string>Val:</string>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QLabel" name="val_imgs_label">
+        <property name="text">
+         <string>0</string>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QLabel" name="label_12">
+        <property name="text">
+         <string>Test:</string>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QLabel" name="test_imgs_label">
+        <property name="text">
+         <string>0</string>
+        </property>
+       </widget>
+      </item>
+     </layout>
+    </widget>
+    <widget class="QWidget" name="horizontalLayoutWidget_5">
+     <property name="geometry">
+      <rect>
+       <x>20</x>
+       <y>100</y>
+       <width>101</width>
+       <height>41</height>
+      </rect>
+     </property>
+     <layout class="QHBoxLayout" name="horizontalLayout_5">
+      <item>
+       <widget class="QLabel" name="label_15">
+        <property name="text">
+         <string>Total:</string>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QLabel" name="total_imgs_label">
+        <property name="text">
+         <string>0</string>
+        </property>
+       </widget>
+      </item>
+     </layout>
+    </widget>
+    <widget class="QPushButton" name="test_button">
+     <property name="geometry">
+      <rect>
+       <x>40</x>
+       <y>210</y>
+       <width>93</width>
+       <height>28</height>
+      </rect>
+     </property>
+     <property name="text">
+      <string>TestButton</string>
      </property>
     </widget>
    </widget>
