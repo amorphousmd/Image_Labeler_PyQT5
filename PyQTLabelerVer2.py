@@ -15,7 +15,9 @@ import random
 import cv2
 import copy
 import math
+import shutil
 from PIL import Image
+from sklearn.model_selection import train_test_split
 
 from PyQt5 import QtCore, QtGui, QtWidgets, uic
 from PyQt5.QtGui import QPixmap
@@ -228,6 +230,8 @@ class Ui_Dialog(QtWidgets.QDialog):
         self.current_dir = str(os.path.dirname(self.filename))
         if self.current_file not in self.annotated_bboxes:
             self.annotated_bboxes[self.current_file] = {}
+        if self.current_file not in self.dataset_metadata:
+            self.dataset_metadata[self.current_file] = {}
 
         self.image_label.setText(self.current_file)
         self.directory_tbrowser.setText(self.current_dir)
@@ -236,6 +240,7 @@ class Ui_Dialog(QtWidgets.QDialog):
         pixmap = QPixmap(self.filename)
         if pixmap.isNull():
             return
+        self.dataset_metadata[self.current_file]['_size'] = [pixmap.width(), pixmap.height()]
         # Set the pixmap as the background for the QGraphicsView widget
         self.scene.clear()
         self.scene.addPixmap(pixmap)
@@ -366,9 +371,14 @@ class Ui_Dialog(QtWidgets.QDialog):
         filename, _ = QtWidgets.QFileDialog.getSaveFileName(self, "Save File", "./Saves", "JSON Files (*.json)")
 
         if filename:
+            # create dictionary to save
+            data = {
+                'annotated_bboxes': self.annotated_bboxes,
+                'dataset_metadata': self.dataset_metadata
+            }
             # write dictionary to file as JSON
             with open(filename, 'w') as f:
-                json.dump(self.annotated_bboxes, f)
+                json.dump(data, f)
 
     def load_annotations(self):
         file_path, _ = QFileDialog.getOpenFileName(None, "Open JSON file", "./Saves", "JSON Files (*.json)")
@@ -377,13 +387,16 @@ class Ui_Dialog(QtWidgets.QDialog):
             with open(file_path, 'r') as f:
                 data = json.load(f)
         try:
-            for img, classes in data.items():
+            for img, classes in data["annotated_bboxes"].items():
                 for cls, bboxes in classes.items():
-                    data[img][cls] = [tuple(bbox) for bbox in bboxes]
+                    data["annotated_bboxes"][img][cls] = [tuple(bbox) for bbox in bboxes]
         except UnboundLocalError:
             print('No file selected')
             return
-        self.annotated_bboxes = data
+
+        self.annotated_bboxes = data["annotated_bboxes"]
+        self.dataset_metadata = data["dataset_metadata"]
+
         try:
             self.redrawBoundingBox(self.current_file)
         except KeyError:
@@ -689,7 +702,7 @@ class Ui_Dialog(QtWidgets.QDialog):
             self.annotated_bboxes.update(new_dict_data)
 
     def test_function(self):
-        folder_path = "./TestFolder"  # replace with the path to your folder
+        folder_path = "./Dataset"
 
         jpg_count = 0
         for filename in os.listdir(folder_path):
@@ -709,7 +722,91 @@ class Ui_Dialog(QtWidgets.QDialog):
         self.train_imgs_label.setText(str(num_train_imgs))
         self.val_imgs_label.setText(str(num_val_imgs))
         self.test_imgs_label.setText(str(num_test_imgs))
+        split_dataset(self.annotated_bboxes, self.dataset_metadata, num_train_imgs, num_val_imgs, num_test_imgs)
 
+def split_dataset(dict_data, sizes, train_size, val_size, test_size):
+    if not os.path.exists("./Dataset"):
+        os.makedirs("./Dataset")
+
+    folders = ['train', 'test', 'val']
+    for folder in folders:
+        if not os.path.exists(f"./Dataset/{folder}"):
+            os.makedirs(f"./Dataset/{folder}")
+
+        if not os.path.exists(f"./Dataset/{folder}/images"):
+            os.makedirs(f"./Dataset/{folder}/images")
+
+        if not os.path.exists(f"./Dataset/{folder}/labels"):
+            os.makedirs(f"./Dataset/{folder}/labels")
+
+    normalized_dict = {}
+    for filename, annotations in dict_data.items():
+        size = sizes[filename]['_size']
+        width, height = size[0], size[1]
+        normalized_annotations = {}
+        for label, bboxes in annotations.items():
+            normalized_bboxes = []
+            for bbox in bboxes:
+                x, y, w, h = bbox
+                x_normalized = x / width
+                y_normalized = y / height
+                w_normalized = w / width
+                h_normalized = h / height
+                normalized_bbox = (x_normalized, y_normalized, w_normalized, h_normalized)
+                normalized_bboxes.append(normalized_bbox)
+            normalized_annotations[label] = normalized_bboxes
+        normalized_dict[filename] = normalized_annotations
+
+    print(normalized_dict)
+
+    # Get the list of image names from normalized_dict
+    image_names = list(normalized_dict.keys())
+
+    # Split the image names into train, val, and test sets
+    train_images, val_test_images = train_test_split(image_names, train_size=train_size, test_size=val_size + test_size)
+    val_images, test_images = train_test_split(val_test_images, train_size=val_size, test_size=test_size)
+
+    # Create the train_normalized_dict, val_normalized_dict, and test_normalized_dict
+    train_normalized_dict = {img_name: normalized_dict[img_name] for img_name in train_images}
+    val_normalized_dict = {img_name: normalized_dict[img_name] for img_name in val_images}
+    test_normalized_dict = {img_name: normalized_dict[img_name] for img_name in test_images}
+
+    print(train_normalized_dict)
+    print(val_normalized_dict)
+    print(test_normalized_dict)
+
+    for img_name, bboxes in train_normalized_dict.items():
+        if not os.path.exists(os.path.join("./Dataset", img_name)):
+            print("Data not found")
+        else:
+            shutil.copy(os.path.join("./Dataset", img_name), os.path.join("./Dataset/train/images", img_name))
+        with open(os.path.join("./Dataset/train/labels", f"{img_name.split('.')[0]}.txt"), "w") as f:
+            for label, boxes in bboxes.items():
+                for box in boxes:
+                    x, y, w, h = box
+                    f.write(f"{label} {x} {y} {w} {h}\n")
+
+    for img_name, bboxes in val_normalized_dict.items():
+        if not os.path.exists(os.path.join("./Dataset", img_name)):
+            print("Data not found")
+        else:
+            shutil.copy(os.path.join("./Dataset", img_name), os.path.join("./Dataset/val/images", img_name))
+        with open(os.path.join("./Dataset/val/labels", f"{img_name.split('.')[0]}.txt"), "w") as f:
+            for label, boxes in bboxes.items():
+                for box in boxes:
+                    x, y, w, h = box
+                    f.write(f"{label} {x} {y} {w} {h}\n")
+
+    for img_name, bboxes in test_normalized_dict.items():
+        if not os.path.exists(os.path.join("./Dataset", img_name)):
+            print("Data not found")
+        else:
+            shutil.copy(os.path.join("./Dataset", img_name), os.path.join("./Dataset/test/images", img_name))
+        with open(os.path.join("./Dataset/test/labels", f"{img_name.split('.')[0]}.txt"), "w") as f:
+            for label, boxes in bboxes.items():
+                for box in boxes:
+                    x, y, w, h = box
+                    f.write(f"{label} {x} {y} {w} {h}\n")
 
 if __name__ == "__main__":
     import sys
