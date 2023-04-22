@@ -139,7 +139,7 @@ class Ui_Dialog(QtWidgets.QDialog):
         self.dataset_metadata = {}
         self.filename = None
         self.current_file = None
-        self.current_dir = None
+        self.current_dir = "./"
         self.current_class_id = '0'
         self.selected_bbox = None
         self.scale_factor = 1.0
@@ -249,6 +249,18 @@ class Ui_Dialog(QtWidgets.QDialog):
         self.redrawBoundingBox(self.current_file)
         self.rewrite_bbox_list(self.current_file)
         self.image_loaded = True
+
+    def touch_image(self, name):
+        self.filename = './Dataset/' + name
+        if not self.filename:
+            return
+
+        pixmap = QPixmap(self.filename)
+        if pixmap.isNull():
+            return
+        if name not in self.dataset_metadata:
+            self.dataset_metadata[name] = {}
+        self.dataset_metadata[name]['_size'] = [pixmap.width(), pixmap.height()]
 
     def change_directory(self):
         options = QFileDialog.Options()
@@ -675,7 +687,7 @@ class Ui_Dialog(QtWidgets.QDialog):
             # make a copy of the original dictionary
             new_dict_data = copy.deepcopy(self.annotated_bboxes)
 
-            for key, value in self.annotated_bboxes.items():
+            for key, value in self.annotated_bboxes_noaug.items():
                 # check if the key ends with ".jpg"
                 if key.endswith(".jpg"):
                     # get the new key name with "_noises.jpg" appended to it
@@ -690,7 +702,7 @@ class Ui_Dialog(QtWidgets.QDialog):
             # make a copy of the original dictionary
             new_dict_data = copy.deepcopy(self.annotated_bboxes)
 
-            for key, value in self.annotated_bboxes.items():
+            for key, value in self.annotated_bboxes_noaug.items():
                 # check if the key ends with ".jpg"
                 if key.endswith(".jpg"):
                     # get the new key name with "_noises.jpg" appended to it
@@ -700,6 +712,11 @@ class Ui_Dialog(QtWidgets.QDialog):
 
             # concatenate the new dictionary with the original one
             self.annotated_bboxes.update(new_dict_data)
+
+            for file_name in os.listdir("./AugmentedImages"):
+                if file_name.endswith(".jpg"):
+                    shutil.copy(os.path.join("./AugmentedImages", file_name), os.path.join("./Dataset", file_name))
+                    self.touch_image(file_name)
 
     def test_function(self):
         folder_path = "./Dataset"
@@ -725,6 +742,8 @@ class Ui_Dialog(QtWidgets.QDialog):
         split_dataset(self.annotated_bboxes, self.dataset_metadata, num_train_imgs, num_val_imgs, num_test_imgs)
 
 def split_dataset(dict_data, sizes, train_size, val_size, test_size):
+    print(dict_data)
+    print(sizes)
     if not os.path.exists("./Dataset"):
         os.makedirs("./Dataset")
 
@@ -748,10 +767,10 @@ def split_dataset(dict_data, sizes, train_size, val_size, test_size):
             normalized_bboxes = []
             for bbox in bboxes:
                 x, y, w, h = bbox
-                x_normalized = x / width
-                y_normalized = y / height
                 w_normalized = w / width
                 h_normalized = h / height
+                x_normalized = x / width + w_normalized / 2
+                y_normalized = y / height + h_normalized / 2
                 normalized_bbox = (x_normalized, y_normalized, w_normalized, h_normalized)
                 normalized_bboxes.append(normalized_bbox)
             normalized_annotations[label] = normalized_bboxes
