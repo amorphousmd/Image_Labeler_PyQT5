@@ -15,15 +15,18 @@ import random
 import cv2
 import copy
 import math
+import glob
 import shutil
 import subprocess
+import threading
 from PIL import Image
 from sklearn.model_selection import train_test_split
 
 from PyQt5 import QtCore, QtGui, QtWidgets, uic
-from PyQt5.QtGui import QPixmap
-from PyQt5.QtCore import Qt, QRectF
-from PyQt5.QtWidgets import QGraphicsScene, QFileDialog
+from PyQt5.QtGui import QPixmap, QPainter
+from PyQt5.QtCore import Qt, QRectF, QTimer
+from PyQt5.QtWidgets import QGraphicsScene, QFileDialog, QVBoxLayout
+from PyQt5.QtChart import QLineSeries, QValueAxis, QChart, QChartView
 
 # YOLOv5 bounding boxes colors
 _COLORS = np.array(
@@ -150,7 +153,58 @@ class Ui_Dialog(QtWidgets.QDialog):
         self.learnrate_combobox.addItem("0.05")
         self.learnrate_combobox.addItem("0.1")
         self.learnrate_combobox.addItem("0.001")
+        self.training_thread = None
 
+        # Timer
+        self.log_file_timer = QTimer()
+        self.log_file_timer.timeout.connect(self.read_log_file)
+        self.log_file_timer.start(1000)  # Check the log file every second
+        self.last_epoch_processed = -1
+
+        # QChart visualization setup
+        # Initialize the main chart
+        self.chart = QChart()
+        self.chart.setTitle("Training Progress")
+        self.chart.legend().hide()
+        self.chartview = QChartView(self.chart, self.tab_2)
+        self.chartview.setGeometry(QtCore.QRect(340, 120, 861, 671))
+        self.chartview.setRenderHint(QPainter.Antialiasing)
+
+        # Initialize the line series for loss, precision, recall, and map
+        self.loss_series = QLineSeries()
+        self.precision_series = QLineSeries()
+        self.recall_series = QLineSeries()
+        self.map_series = QLineSeries()
+
+        # Add the line series to the main chart
+        self.chart.addSeries(self.loss_series)
+        self.chart.addSeries(self.precision_series)
+        self.chart.addSeries(self.recall_series)
+        self.chart.addSeries(self.map_series)
+
+        # Set up the axes for the main chart
+        self.axisX = QValueAxis()
+        self.axisX.setLabelFormat("%d")
+        self.axisX.setTitleText("Epoch")
+        self.axisX.setTickCount(11)
+        self.axisX.setRange(0, 50)
+        self.chart.addAxis(self.axisX, Qt.AlignBottom)
+
+        self.axisY = QValueAxis()
+        self.axisY.setLabelFormat("%.2f")
+        self.axisY.setTitleText("Loss/Precision/Recall/mAP")
+        self.axisY.setTickCount(6)
+        self.chart.addAxis(self.axisY, Qt.AlignLeft)
+
+        # Attach the axes to the line series
+        self.loss_series.attachAxis(self.axisX)
+        self.loss_series.attachAxis(self.axisY)
+        self.precision_series.attachAxis(self.axisX)
+        self.precision_series.attachAxis(self.axisY)
+        self.recall_series.attachAxis(self.axisX)
+        self.recall_series.attachAxis(self.axisY)
+        self.map_series.attachAxis(self.axisX)
+        self.map_series.attachAxis(self.axisY)
 
         # Set up general variables that are used for keeping track of annotated images
         self.image_loaded = False
@@ -771,13 +825,53 @@ class Ui_Dialog(QtWidgets.QDialog):
             filename = "yolov7_training.pt"
 
             subprocess.run(["powershell", "-Command", f"Invoke-WebRequest -Uri {url} -OutFile {filename}"])
+        self.training_thread = threading.Thread(target=self.run_training)
+        self.training_thread.start()
 
-        print('start')
+    def run_training(self):
+        # Run the training command and capture its output
         command = """
-        cd ./Training/yolov7 && python train.py --batch 1 --epochs 50 --data ../../Exports/yolov7/CrackersDataset/data.yaml --weights 'yolov7_training.pt' --device 0 --hyp data/hyp.scratch.p5.yaml --cfg cfg/training/yolov7.yaml
-        """
+                    cd ./Training/yolov7 && python train.py --batch 1 --epochs 50 --data ../../Exports/yolov7/CrackersDataset/data.yaml --weights 'yolov7_training.pt' --device 0 --hyp data/hyp.scratch.p5.yaml --cfg cfg/training/yolov7.yaml
+                """
         os.system(command)
-        print('end')
+
+    def read_log_file(self):
+        # Get the latest log file
+        try:
+            log_file = max(glob.glob('./Training/yolov7/runs/train/*/results.txt'), key=os.path.getctime)
+        except ValueError:
+            print("Baby don't hurt me, don't hurt me, no more")
+            return
+
+        with open(log_file, 'r') as f:
+            for line in f:
+                line_values = line.strip().split()
+                epoch, loss, precision, recall, map50 = [line_values[i] for i in [0, 5, 8, 9, 10]]
+                epoch = int(epoch.split('/')[0])
+                if epoch > self.last_epoch_processed:
+                    self.last_epoch_processed = epoch
+                    print(epoch, loss)
+                    epoch = int(epoch)
+
+                    # Update the line series with the new data point
+                    self.loss_series.append(epoch, float(loss))
+                    self.precision_series.append(epoch, float(precision))
+                    self.recall_series.append(epoch, float(recall))
+                    self.map_series.append(epoch, float(map50))
+                else:
+                    # print("old info")
+                    pass
+
+        # Check if the training thread has finished
+        if self.training_thread is not None and not self.training_thread.is_alive():
+            # Enable the start_training_button
+            # self.start_training_button.setEnabled(True)
+            print('done')
+    def update_graphics_view(self, output):
+        print("\n")
+        print(output)
+        print("\n")
+
 
 def split_dataset(dict_data, sizes, train_size, val_size, test_size):
     print(dict_data)
@@ -864,6 +958,13 @@ def split_dataset(dict_data, sizes, train_size, val_size, test_size):
                 for box in boxes:
                     x, y, w, h = box
                     f.write(f"{label} {x} {y} {w} {h}\n")
+
+def find_newest_results_folder():
+    results_folders = glob.glob('./Training/yolov7/runs/train/exp*')
+    newest_folder = max(results_folders, key=os.path.getctime)
+    return newest_folder
+
+
 
 if __name__ == "__main__":
     import sys
