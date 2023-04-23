@@ -763,11 +763,21 @@ class Ui_Dialog(QtWidgets.QDialog):
         split_dataset(self.annotated_bboxes, self.dataset_metadata, num_train_imgs, num_val_imgs, num_test_imgs)
 
     def train(self):
-        print('train function')
-        if not os.path.exists('./yolov7'):
-            print('yolov7 folder not found')
-            # Clone the repository using Git
-            subprocess.run(['git', 'clone', 'https://github.com/WongKinYiu/yolov7.git'])
+        if not os.path.exists("Training/yolov7"):
+            print("YOLOv7 folder not found")
+            subprocess.run(["git", "clone", "https://github.com/WongKinYiu/yolov7.git", "Training/yolov7"],
+                           cwd=os.getcwd(), check=True)
+            url = "https://github.com/WongKinYiu/yolov7/releases/download/v0.1/yolov7_training.pt"
+            filename = "yolov7_training.pt"
+
+            subprocess.run(["powershell", "-Command", f"Invoke-WebRequest -Uri {url} -OutFile {filename}"])
+
+        print('start')
+        command = """
+        cd ./Training/yolov7 && python train.py --batch 1 --epochs 50 --data ../../Exports/yolov7/CrackersDataset/data.yaml --weights 'yolov7_training.pt' --device 0 --hyp data/hyp.scratch.p5.yaml --cfg cfg/training/yolov7.yaml
+        """
+        os.system(command)
+        print('end')
 
 def split_dataset(dict_data, sizes, train_size, val_size, test_size):
     print(dict_data)
