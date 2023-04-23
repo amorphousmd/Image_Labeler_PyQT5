@@ -16,6 +16,7 @@ import cv2
 import copy
 import math
 import shutil
+import subprocess
 from PIL import Image
 from sklearn.model_selection import train_test_split
 
@@ -131,6 +132,25 @@ class Ui_Dialog(QtWidgets.QDialog):
         font = QtGui.QFont()
         font.setPointSize(8)  # set the font size to 12 points
         self.bbox_tbrowser.setFont(font)
+        self.output_format_combobox.addItem("YOLOv7 Pytorch (.txt)")
+        self.output_format_combobox.addItem("YOLOv5 Pytorch (.txt)")
+        self.output_format_combobox.addItem("COCO (.json)")
+        self.output_format_combobox.addItem("Tensorflow Detection (.csv)")
+        self.model_combobox.addItem("YOLOv7")
+        self.model_combobox.addItem("YOLOv7-tiny")
+        self.epochs_combobox.addItem("25")
+        self.epochs_combobox.addItem("50")
+        self.epochs_combobox.addItem("100")
+        self.epochs_combobox.addItem("200")
+        self.batchsize_combobox.addItem("4")
+        self.batchsize_combobox.addItem("8")
+        self.batchsize_combobox.addItem("16")
+        self.batchsize_combobox.addItem("32")
+        self.learnrate_combobox.addItem("0.01")
+        self.learnrate_combobox.addItem("0.05")
+        self.learnrate_combobox.addItem("0.1")
+        self.learnrate_combobox.addItem("0.001")
+
 
         # Set up general variables that are used for keeping track of annotated images
         self.image_loaded = False
@@ -160,7 +180,8 @@ class Ui_Dialog(QtWidgets.QDialog):
         self.export_button.clicked.connect(self.export)
         self.tvt_slider.valueChanged.connect(lambda value: self.tvt_label.setText(str(value)))
         self.vt_slider.valueChanged.connect(lambda value: self.vt_label.setText(str(value)))
-        self.test_button.clicked.connect(self.test_function)
+        self.generate_dataset_button.clicked.connect(self.generate_dataset)
+        self.train_button.clicked.connect(self.train)
 
         QtCore.QMetaObject.connectSlotsByName(Dialog)
         self.graphicsView.viewport().installEventFilter(self)
@@ -718,7 +739,7 @@ class Ui_Dialog(QtWidgets.QDialog):
                     shutil.copy(os.path.join("./AugmentedImages", file_name), os.path.join("./Dataset", file_name))
                     self.touch_image(file_name)
 
-    def test_function(self):
+    def generate_dataset(self):
         folder_path = "./Dataset"
 
         jpg_count = 0
@@ -740,6 +761,13 @@ class Ui_Dialog(QtWidgets.QDialog):
         self.val_imgs_label.setText(str(num_val_imgs))
         self.test_imgs_label.setText(str(num_test_imgs))
         split_dataset(self.annotated_bboxes, self.dataset_metadata, num_train_imgs, num_val_imgs, num_test_imgs)
+
+    def train(self):
+        print('train function')
+        if not os.path.exists('./yolov7'):
+            print('yolov7 folder not found')
+            # Clone the repository using Git
+            subprocess.run(['git', 'clone', 'https://github.com/WongKinYiu/yolov7.git'])
 
 def split_dataset(dict_data, sizes, train_size, val_size, test_size):
     print(dict_data)
