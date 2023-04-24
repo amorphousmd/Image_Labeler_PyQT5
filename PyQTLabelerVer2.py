@@ -16,6 +16,7 @@ import cv2
 import copy
 import math
 import glob
+import yaml
 import shutil
 import subprocess
 import threading
@@ -145,6 +146,8 @@ class Ui_Dialog(QtWidgets.QDialog):
         self.epochs_combobox.addItem("50")
         self.epochs_combobox.addItem("100")
         self.epochs_combobox.addItem("200")
+        self.batchsize_combobox.addItem("1")
+        self.batchsize_combobox.addItem("2")
         self.batchsize_combobox.addItem("4")
         self.batchsize_combobox.addItem("8")
         self.batchsize_combobox.addItem("16")
@@ -169,93 +172,93 @@ class Ui_Dialog(QtWidgets.QDialog):
         self.recall_series = QLineSeries()
         self.map_series = QLineSeries()
         # Create chart 1 for loss series
-        chart1 = QChart()
-        chart1.setTitle("Loss Progress")
-        chart1.legend().hide()
-        chartview1 = QChartView(chart1, self.tab_2)
-        chartview1.setGeometry(QtCore.QRect(340, 120, 430, 335))
-        chartview1.setRenderHint(QPainter.Antialiasing)
-        chart1.addSeries(self.loss_series)
-        axisX1 = QValueAxis()
-        axisX1.setLabelFormat("%d")
-        axisX1.setTitleText("Epoch")
-        axisX1.setTickCount(11)
-        axisX1.setRange(0, 50)
-        chart1.addAxis(axisX1, Qt.AlignBottom)
-        axisY1 = QValueAxis()
-        axisY1.setLabelFormat("%.2f")
-        axisY1.setTitleText("Loss")
-        axisY1.setTickCount(6)
-        chart1.addAxis(axisY1, Qt.AlignLeft)
-        self.loss_series.attachAxis(axisX1)
-        self.loss_series.attachAxis(axisY1)
+        self.chart1 = QChart()
+        self.chart1.setTitle("Loss Progress")
+        self.chart1.legend().hide()
+        self.chartview1 = QChartView(self.chart1, self.tab_2)
+        self.chartview1.setGeometry(QtCore.QRect(340, 120, 430, 335))
+        self.chartview1.setRenderHint(QPainter.Antialiasing)
+        self.chart1.addSeries(self.loss_series)
+        self.axisX1 = QValueAxis()
+        self.axisX1.setLabelFormat("%d")
+        self.axisX1.setTitleText("Epoch")
+        self.axisX1.setTickCount(11)
+        self.axisX1.setRange(0, 50)
+        self.chart1.addAxis(self.axisX1, Qt.AlignBottom)
+        self.axisY1 = QValueAxis()
+        self.axisY1.setLabelFormat("%.2f")
+        self.axisY1.setTitleText("Loss")
+        self.axisY1.setTickCount(6)
+        self.chart1.addAxis(self.axisY1, Qt.AlignLeft)
+        self.loss_series.attachAxis(self.axisX1)
+        self.loss_series.attachAxis(self.axisY1)
 
         # Create chart 2 for precision series
-        chart2 = QChart()
-        chart2.setTitle("Precision Progress")
-        chart2.legend().hide()
-        chartview2 = QChartView(chart2, self.tab_2)
-        chartview2.setGeometry(QtCore.QRect(770, 120, 431, 335))
-        chartview2.setRenderHint(QPainter.Antialiasing)
-        chart2.addSeries(self.precision_series)
-        axisX2 = QValueAxis()
-        axisX2.setLabelFormat("%d")
-        axisX2.setTitleText("Epoch")
-        axisX2.setTickCount(11)
-        axisX2.setRange(0, 50)
-        chart2.addAxis(axisX2, Qt.AlignBottom)
-        axisY2 = QValueAxis()
-        axisY2.setLabelFormat("%.2f")
-        axisY2.setTitleText("Precision")
-        axisY2.setTickCount(6)
-        chart2.addAxis(axisY2, Qt.AlignLeft)
-        self.precision_series.attachAxis(axisX2)
-        self.precision_series.attachAxis(axisY2)
+        self.chart2 = QChart()
+        self.chart2.setTitle("Precision Progress")
+        self.chart2.legend().hide()
+        self.chartview2 = QChartView(self.chart2, self.tab_2)
+        self.chartview2.setGeometry(QtCore.QRect(770, 120, 431, 335))
+        self.chartview2.setRenderHint(QPainter.Antialiasing)
+        self.chart2.addSeries(self.precision_series)
+        self.axisX2 = QValueAxis()
+        self.axisX2.setLabelFormat("%d")
+        self.axisX2.setTitleText("Epoch")
+        self.axisX2.setTickCount(11)
+        self.axisX2.setRange(0, 50)
+        self.chart2.addAxis(self.axisX2, Qt.AlignBottom)
+        self.axisY2 = QValueAxis()
+        self.axisY2.setLabelFormat("%.2f")
+        self.axisY2.setTitleText("Precision")
+        self.axisY2.setTickCount(6)
+        self.chart2.addAxis(self.axisY2, Qt.AlignLeft)
+        self.precision_series.attachAxis(self.axisX2)
+        self.precision_series.attachAxis(self.axisY2)
 
         # Create chart 3 for recall series
-        chart3 = QChart()
-        chart3.setTitle("Recall Progress")
-        chart3.legend().hide()
-        chartview3 = QChartView(chart3, self.tab_2)
-        chartview3.setGeometry(QtCore.QRect(340, 480, 430, 311))
-        chartview3.setRenderHint(QPainter.Antialiasing)
-        chart3.addSeries(self.recall_series)
-        axisX3 = QValueAxis()
-        axisX3.setLabelFormat("%d")
-        axisX3.setTitleText("Epoch")
-        axisX3.setTickCount(11)
-        axisX3.setRange(0, 50)
-        chart3.addAxis(axisX3, Qt.AlignBottom)
-        axisY3 = QValueAxis()
-        axisY3.setLabelFormat("%.2f")
-        axisY3.setTitleText("Recall")
-        axisY3.setTickCount(6)
-        chart3.addAxis(axisY3, Qt.AlignLeft)
-        self.recall_series.attachAxis(axisX3)
-        self.recall_series.attachAxis(axisY3)
+        self.chart3 = QChart()
+        self.chart3.setTitle("Recall Progress")
+        self.chart3.legend().hide()
+        self.chartview3 = QChartView(self.chart3, self.tab_2)
+        self.chartview3.setGeometry(QtCore.QRect(340, 480, 430, 311))
+        self.chartview3.setRenderHint(QPainter.Antialiasing)
+        self.chart3.addSeries(self.recall_series)
+        self.axisX3 = QValueAxis()
+        self.axisX3.setLabelFormat("%d")
+        self.axisX3.setTitleText("Epoch")
+        self.axisX3.setTickCount(11)
+        self.axisX3.setRange(0, 50)
+        self.chart3.addAxis(self.axisX3, Qt.AlignBottom)
+        self.axisY3 = QValueAxis()
+        self.axisY3.setLabelFormat("%.2f")
+        self.axisY3.setTitleText("Recall")
+        self.axisY3.setTickCount(6)
+        self.chart3.addAxis(self.axisY3, Qt.AlignLeft)
+        self.recall_series.attachAxis(self.axisX3)
+        self.recall_series.attachAxis(self.axisY3)
 
         # Create chart 4 for map series
-        chart4 = QChart()
-        chart4.setTitle("mAP Progress")
-        chart4.legend().hide()
-        chartview4 = QChartView(chart4, self.tab_2)
-        chartview4.setGeometry(QtCore.QRect(770, 480, 431, 311))
-        chartview4.setRenderHint(QPainter.Antialiasing)
-        chart4.addSeries(self.map_series)
-        axisX4 = QValueAxis()
-        axisX4.setLabelFormat("%d")
-        axisX4.setTitleText("Epoch")
-        axisX4.setTickCount(11)
-        axisX4.setRange(0, 50)
-        chart4.addAxis(axisX4, Qt.AlignBottom)
-        axisY4 = QValueAxis()
-        axisY4.setLabelFormat("%.2f")
-        axisY4.setTitleText("mAP")
-        axisY4.setTickCount(6)
-        axisY4.setRange(0, 0.001)
-        chart4.addAxis(axisY4, Qt.AlignLeft)
-        self.map_series.attachAxis(axisX4)
-        self.map_series.attachAxis(axisY4)
+        self.chart4 = QChart()
+        self.chart4.setTitle("mAP Progress")
+        self.chart4.legend().hide()
+        self.chartview4 = QChartView(self.chart4, self.tab_2)
+        self.chartview4.setGeometry(QtCore.QRect(770, 480, 431, 311))
+        self.chartview4.setRenderHint(QPainter.Antialiasing)
+        self.chart4.addSeries(self.map_series)
+        self.axisX4 = QValueAxis()
+        self.axisX4.setLabelFormat("%d")
+        self.axisX4.setTitleText("Epoch")
+        self.axisX4.setTickCount(11)
+        self.axisX4.setRange(0, 50)
+        self.chart4.addAxis(self.axisX4, Qt.AlignBottom)
+        self.axisY4 = QValueAxis()
+        self.axisY4.setLabelFormat("%.2f")
+        self.axisY4.setTitleText("mAP")
+        self.axisY4.setTickCount(6)
+        self.axisY4.setRange(0, 0.001)
+        self.chart4.addAxis(self.axisY4, Qt.AlignLeft)
+        self.map_series.attachAxis(self.axisX4)
+        self.map_series.attachAxis(self.axisY4)
 
         # Set up general variables that are used for keeping track of annotated images
         self.image_loaded = False
@@ -881,9 +884,22 @@ class Ui_Dialog(QtWidgets.QDialog):
 
     def run_training(self):
         # Run the training command and capture its output
-        command = """
-                    cd ./Training/yolov7 && python train.py --batch 1 --epochs 50 --data ../../Exports/yolov7/CrackersDataset/data.yaml --weights 'yolov7_training.pt' --device 0 --hyp data/hyp.scratch.p5.yaml --cfg cfg/training/yolov7.yaml
-                """
+        batch_size = self.batchsize_combobox.currentText()
+        epochs = self.epochs_combobox.currentText()
+        # read YAML file
+        with open('./Training/yolov7/data/hyp.scratch.p5.yaml', 'r') as f:
+            data = yaml.safe_load(f)
+
+        # update lr0 value
+        learn_rate = float(self.learnrate_combobox.currentText())
+        data['lr0'] = learn_rate
+
+        # write updated YAML file back to disk
+        with open('./Training/yolov7/data/hyp.scratch.p5.yaml', 'w') as f:
+            yaml.dump(data, f)
+        command = f"""
+            cd ./Training/yolov7 && python train.py --batch {batch_size} --epochs {epochs} --data ../../Exports/yolov7/CrackersDataset/data.yaml --weights 'yolov7_training.pt' --device 0 --hyp data/hyp.scratch.p5.yaml --cfg cfg/training/yolov7.yaml
+        """
         os.system(command)
 
     def read_log_file(self):
@@ -891,7 +907,6 @@ class Ui_Dialog(QtWidgets.QDialog):
         try:
             log_file = max(glob.glob('./Training/yolov7/runs/train/*/results.txt'), key=os.path.getctime)
         except ValueError:
-            print("Baby don't hurt me, don't hurt me, no more")
             return
 
         with open(log_file, 'r') as f:
@@ -909,6 +924,71 @@ class Ui_Dialog(QtWidgets.QDialog):
                     self.precision_series.append(epoch, float(precision))
                     self.recall_series.append(epoch, float(recall))
                     self.map_series.append(epoch, float(map50))
+
+                    # Calculate min and max values for loss
+                    loss_min = float('inf')
+                    loss_max = float('-inf')
+
+                    for point in self.loss_series.pointsVector():
+                        x, y = point.x(), point.y()
+                        if y < loss_min:
+                            loss_min = y
+                        if y > loss_max:
+                            loss_max = y
+
+                    # Calculate min and max values for precision
+                    precision_min = float('inf')
+                    precision_max = float('-inf')
+
+                    for point in self.precision_series.pointsVector():
+                        x, y = point.x(), point.y()
+                        if y < precision_min:
+                            precision_min = y
+                        if y > precision_max:
+                            precision_max = y
+
+                    # Calculate min and max values for recall
+                    recall_min = float('inf')
+                    recall_max = float('-inf')
+
+                    for point in self.recall_series.pointsVector():
+                        x, y = point.x(), point.y()
+                        if y < recall_min:
+                            recall_min = y
+                        if y > recall_max:
+                            recall_max = y
+
+                    # Calculate min and max values for map
+                    map_min = float('inf')
+                    map_max = float('-inf')
+
+                    for point in self.map_series.pointsVector():
+                        x, y = point.x(), point.y()
+                        if y < map_min:
+                            map_min = y
+                        if y > map_max:
+                            map_max = y
+
+                    # Update the y-axis range for each graph
+
+                    self.axisY1.setRange(loss_min * 9 / 10, loss_max * 10 / 9)
+                    self.axisY2.setRange(precision_min * 9 / 10, precision_max * 10 / 9)
+                    self.axisY3.setRange(recall_min * 9 / 10, recall_max * 10 / 9)
+                    self.axisY4.setRange(map_min * 9 / 10, map_max * 10 / 9)
+
+                    self.chart1.addAxis(self.axisY1, Qt.AlignLeft)
+                    self.chart2.addAxis(self.axisY2, Qt.AlignLeft)
+                    self.chart3.addAxis(self.axisY3, Qt.AlignLeft)
+                    self.chart4.addAxis(self.axisY4, Qt.AlignLeft)
+
+                    self.loss_series.attachAxis(self.axisX1)
+                    self.loss_series.attachAxis(self.axisY1)
+                    self.precision_series.attachAxis(self.axisX2)
+                    self.precision_series.attachAxis(self.axisY2)
+                    self.recall_series.attachAxis(self.axisX3)
+                    self.recall_series.attachAxis(self.axisY3)
+                    self.map_series.attachAxis(self.axisX4)
+                    self.map_series.attachAxis(self.axisY4)
                 else:
                     # print("old info")
                     pass
