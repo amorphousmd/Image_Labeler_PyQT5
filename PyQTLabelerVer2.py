@@ -303,6 +303,8 @@ class Ui_Dialog(QtWidgets.QDialog):
         self.endPos = None
         self.drawnBox = False
         self.isDrawing = False
+        self.drawnArrow = False
+        self.isDrawingArrow = False
         self.dottedLines = []  # initialize a list to keep track of the dotted lines
         self.ctrl_pressed = False
         self.last_mouse_pos = None
@@ -554,6 +556,9 @@ class Ui_Dialog(QtWidgets.QDialog):
         if event.key() == QtCore.Qt.Key_B:
             self.isDrawing = True
             event.accept()  # accept the event to stop it from propagating to other widgets
+        elif event.key() == QtCore.Qt.Key_A:
+            self.isDrawingArrow = True
+            event.accept()  # accept the event to stop it from propagating to other widgets
         elif event.key() == QtCore.Qt.Key_Delete:
             for key, value in self.annotated_bboxes[self.current_file].items():
                 for bbox in value:
@@ -619,6 +624,11 @@ class Ui_Dialog(QtWidgets.QDialog):
                 self.endPos = pos
                 self.drawBoundingBoxPreview()
 
+            if self.drawnArrow:
+                pos = self.graphicsView.mapToScene(event.pos())
+                self.arrowEnd = pos
+                self.drawArrowPreview()
+
             if event.buttons() == QtCore.Qt.LeftButton and self.ctrl_pressed:
                 cursor = QtGui.QCursor()
                 if self.last_mouse_pos is None:
@@ -670,6 +680,25 @@ class Ui_Dialog(QtWidgets.QDialog):
                     self.bbox_tbrowser.addItem(self.current_class_id + ' ' + str(bbox))
                     return True
 
+            elif self.isDrawingArrow:
+                if not self.drawnArrow:
+                    # start drawing
+                    start = self.graphicsView.mapToScene(event.pos())
+                    print(start)
+                    self.arrowStart = start
+                    self.arrowEnd = start
+                    self.drawnArrow = True
+                    return True
+                else:
+                    # finish drawing
+                    end = self.graphicsView.mapToScene(event.pos())
+                    print(end)
+                    self.arrowEnd = end
+                    self.drawnArrow = False
+                    self.isDrawingArrow = False
+                    self.drawArrow()
+                    return True
+
         if event.type() == QtCore.QEvent.Wheel and source is self.graphicsView.viewport():
             if self.ctrl_pressed:
                 delta = event.angleDelta().y()
@@ -700,6 +729,37 @@ class Ui_Dialog(QtWidgets.QDialog):
         self.endPos = None
         self.drawnBox = False
 
+    def drawArrow(self):
+        # create a QGraphicsLineItem to represent the arrow
+        items = self.scene.items()
+        # Iterate through the list to find the item you're looking for
+        for item in items:
+            if isinstance(item, QtWidgets.QGraphicsLineItem) and item.data(0) == 'preview_arrow':
+                self.scene.removeItem(item)
+        arrow = QtGui.QPainterPath()
+        arrow.moveTo(self.arrowStart)
+        arrow.lineTo(self.arrowEnd)
+        arrow_head_len = 20
+        arrow_head_angle = 45
+        angle = math.atan2(self.arrowEnd.y() - self.arrowStart.y(), self.arrowEnd.x() - self.arrowStart.x())
+        arrow_p1 = QtCore.QPointF(
+            self.arrowEnd.x() + arrow_head_len * math.cos(angle - math.pi + math.radians(arrow_head_angle)),
+            self.arrowEnd.y() + arrow_head_len * math.sin(angle - math.pi + math.radians(arrow_head_angle)))
+        arrow_p2 = QtCore.QPointF(
+            self.arrowEnd.x() + arrow_head_len * math.cos(angle - math.pi - math.radians(arrow_head_angle)),
+            self.arrowEnd.y() + arrow_head_len * math.sin(angle - math.pi - math.radians(arrow_head_angle)))
+        arrow.lineTo(arrow_p1)
+        arrow.moveTo(self.arrowEnd)
+        arrow.lineTo(arrow_p2)
+        item = QtWidgets.QGraphicsPathItem(arrow)
+        # Grabbing the colors from indices
+        R, G, B = [int(i * 255) for i in _COLORS[int(self.current_class_id)]]
+        item.setPen(QtGui.QPen(QtGui.QColor(R, G, B), 3))
+        self.scene.addItem(item)
+        self.arrowStart = None
+        self.arrowEnd = None
+        self.drawnArrow = False
+
     def drawBoundingBoxPreview(self):
         items = self.scene.items()
 
@@ -715,6 +775,35 @@ class Ui_Dialog(QtWidgets.QDialog):
         item.setPen(QtGui.QPen(QtGui.QColor(R, G, B)))
         item.setBrush(QtGui.QBrush(QtGui.QColor(R, G, B, 50)))
         item.setData(0, 'preview_box')
+        self.scene.addItem(item)
+
+    def drawArrowPreview(self):
+        # create a QGraphicsLineItem to represent the arrow
+        items = self.scene.items()
+        # Iterate through the list to find the item you're looking for
+        for item in items:
+            if item.data(0) == 'preview_arrow':
+                self.scene.removeItem(item)
+        arrow = QtGui.QPainterPath()
+        arrow.moveTo(self.arrowStart)
+        arrow.lineTo(self.arrowEnd)
+        arrow_head_len = 20
+        arrow_head_angle = 45
+        angle = math.atan2(self.arrowEnd.y() - self.arrowStart.y(), self.arrowEnd.x() - self.arrowStart.x())
+        arrow_p1 = QtCore.QPointF(
+            self.arrowEnd.x() + arrow_head_len * math.cos(angle - math.pi + math.radians(arrow_head_angle)),
+            self.arrowEnd.y() + arrow_head_len * math.sin(angle - math.pi + math.radians(arrow_head_angle)))
+        arrow_p2 = QtCore.QPointF(
+            self.arrowEnd.x() + arrow_head_len * math.cos(angle - math.pi - math.radians(arrow_head_angle)),
+            self.arrowEnd.y() + arrow_head_len * math.sin(angle - math.pi - math.radians(arrow_head_angle)))
+        arrow.lineTo(arrow_p1)
+        arrow.moveTo(self.arrowEnd)
+        arrow.lineTo(arrow_p2)
+        item = QtWidgets.QGraphicsPathItem(arrow)
+        # Grabbing the colors from indices
+        R, G, B = [int(i * 255) for i in _COLORS[int(self.current_class_id)]]
+        item.setPen(QtGui.QPen(QtGui.QColor(R, G, B), 3))
+        item.setData(0, 'preview_arrow')
         self.scene.addItem(item)
 
     def export(self):
