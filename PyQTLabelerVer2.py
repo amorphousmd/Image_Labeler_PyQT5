@@ -12,6 +12,7 @@ import numpy as np
 import re
 import json
 import random
+import ast
 import cv2
 import copy
 import math
@@ -263,13 +264,16 @@ class Ui_Dialog(QtWidgets.QDialog):
         # Set up general variables that are used for keeping track of annotated images
         self.image_loaded = False
         self.annotated_bboxes = {}
+        self.annotated_keypoints = {}
         self.annotated_bboxes_noaug = {}
         self.dataset_metadata = {}
         self.filename = None
         self.current_file = None
         self.current_dir = "./"
         self.current_class_id = '0'
+        self.selected_type = None
         self.selected_bbox = None
+        self.selected_kpt = None
         self.scale_factor = 1.0
         self.tvt_split_ratio = 0.8
         self.vt_split_ratio = 0.5
@@ -317,6 +321,7 @@ class Ui_Dialog(QtWidgets.QDialog):
     def load_image(self):
         print(self.annotated_bboxes)
         print(self.dataset_metadata)
+        print(self.annotated_keypoints)
         for line in self.dottedLines:
             self.graphicsView.scene().removeItem(line)
         self.dottedLines = []
@@ -331,6 +336,8 @@ class Ui_Dialog(QtWidgets.QDialog):
             self.annotated_bboxes[self.current_file] = {}
         if self.current_file not in self.dataset_metadata:
             self.dataset_metadata[self.current_file] = {}
+        if self.current_file not in self.annotated_keypoints:
+            self.annotated_keypoints[self.current_file] = {}
 
         self.image_label.setText(self.current_file)
         self.directory_tbrowser.setText(self.current_dir)
@@ -347,6 +354,7 @@ class Ui_Dialog(QtWidgets.QDialog):
         self.graphicsView.fitInView(QRectF(pixmap.rect()), Qt.KeepAspectRatio)
         self.redrawBoundingBox(self.current_file)
         self.rewrite_bbox_list(self.current_file)
+        self.redrawKeypoints(self.current_file)
         self.image_loaded = True
 
     def load_image_nopath(self, name):
@@ -363,6 +371,8 @@ class Ui_Dialog(QtWidgets.QDialog):
             self.annotated_bboxes[self.current_file] = {}
         if self.current_file not in self.dataset_metadata:
             self.dataset_metadata[self.current_file] = {}
+        if self.current_file not in self.annotated_keypoints:
+            self.annotated_keypoints[self.current_file] = {}
 
         self.image_label.setText(self.current_file)
         self.directory_tbrowser.setText(self.current_dir)
@@ -379,6 +389,7 @@ class Ui_Dialog(QtWidgets.QDialog):
         self.graphicsView.fitInView(QRectF(pixmap.rect()), Qt.KeepAspectRatio)
         self.redrawBoundingBox(self.current_file)
         self.rewrite_bbox_list(self.current_file)
+        self.redrawKeypoints(self.current_file)
         self.image_loaded = True
 
     def touch_image(self, name):
@@ -490,13 +501,111 @@ class Ui_Dialog(QtWidgets.QDialog):
         item.setBrush(QtGui.QBrush(QtGui.QColor(R, G, B, 150)))
         self.scene.addItem(item)
 
+    def redrawKeypoints(self, current_file):
+        # iterate over each image file in the dictionary
+        try:
+            for key, value in self.annotated_keypoints[current_file].items():
+                for keypoints in value:
+                    arrowStart = QtCore.QPointF(*keypoints[0][:2])
+                    arrowEnd = QtCore.QPointF(*keypoints[1][:2])
+                    arrow = QtGui.QPainterPath()
+                    arrow.moveTo(arrowStart)
+                    arrow.lineTo(arrowEnd)
+                    arrow_head_len = 20
+                    arrow_head_angle = 45
+                    angle = math.atan2(arrowEnd.y() - arrowStart.y(), arrowEnd.x() - arrowStart.x())
+                    arrow_p1 = QtCore.QPointF(
+                        arrowEnd.x() + arrow_head_len * math.cos(angle - math.pi + math.radians(arrow_head_angle)),
+                        arrowEnd.y() + arrow_head_len * math.sin(angle - math.pi + math.radians(arrow_head_angle)))
+                    arrow_p2 = QtCore.QPointF(
+                        arrowEnd.x() + arrow_head_len * math.cos(angle - math.pi - math.radians(arrow_head_angle)),
+                        arrowEnd.y() + arrow_head_len * math.sin(angle - math.pi - math.radians(arrow_head_angle)))
+                    arrow.lineTo(arrow_p1)
+                    arrow.moveTo(arrowEnd)
+                    arrow.lineTo(arrow_p2)
+                    item = QtWidgets.QGraphicsPathItem(arrow)
+                    # Grabbing the colors from indices
+                    R, G, B = [int(i * 255) for i in _COLORS[int(self.current_class_id)]]
+                    item.setPen(QtGui.QPen(QtGui.QColor(R, G, B), 3))
+                    self.scene.addItem(item)
+        except KeyError:
+            return
+
+    def redrawKeypointsExcept(self, current_file, except_kpt, highlight_class):
+        for item in self.scene.items():
+            if isinstance(item, QtWidgets.QGraphicsPathItem):
+                self.scene.removeItem(item)
+        # iterate over each image file in the dictionary
+        for key, value in self.annotated_keypoints[current_file].items():
+            for keypoints in value:
+                if keypoints == except_kpt:
+                    continue
+                arrowStart = QtCore.QPointF(*keypoints[0][:2])
+                arrowEnd = QtCore.QPointF(*keypoints[1][:2])
+                arrow = QtGui.QPainterPath()
+                arrow.moveTo(arrowStart)
+                arrow.lineTo(arrowEnd)
+                arrow_head_len = 20
+                arrow_head_angle = 45
+                angle = math.atan2(arrowEnd.y() - arrowStart.y(), arrowEnd.x() - arrowStart.x())
+                arrow_p1 = QtCore.QPointF(
+                    arrowEnd.x() + arrow_head_len * math.cos(angle - math.pi + math.radians(arrow_head_angle)),
+                    arrowEnd.y() + arrow_head_len * math.sin(angle - math.pi + math.radians(arrow_head_angle)))
+                arrow_p2 = QtCore.QPointF(
+                    arrowEnd.x() + arrow_head_len * math.cos(angle - math.pi - math.radians(arrow_head_angle)),
+                    arrowEnd.y() + arrow_head_len * math.sin(angle - math.pi - math.radians(arrow_head_angle)))
+                arrow.lineTo(arrow_p1)
+                arrow.moveTo(arrowEnd)
+                arrow.lineTo(arrow_p2)
+                item = QtWidgets.QGraphicsPathItem(arrow)
+                # Grabbing the colors from indices
+                R, G, B = [int(i * 255) for i in _COLORS[int(self.current_class_id)]]
+                item.setPen(QtGui.QPen(QtGui.QColor(R, G, B), 3))
+                self.scene.addItem(item)
+        arrowStart = QtCore.QPointF(*except_kpt[0][:2])
+        arrowEnd = QtCore.QPointF(*except_kpt[1][:2])
+        arrow = QtGui.QPainterPath()
+        arrow.moveTo(arrowStart)
+        arrow.lineTo(arrowEnd)
+        arrow_head_len = 20
+        arrow_head_angle = 45
+        angle = math.atan2(arrowEnd.y() - arrowStart.y(), arrowEnd.x() - arrowStart.x())
+        arrow_p1 = QtCore.QPointF(
+            arrowEnd.x() + arrow_head_len * math.cos(angle - math.pi + math.radians(arrow_head_angle)),
+            arrowEnd.y() + arrow_head_len * math.sin(angle - math.pi + math.radians(arrow_head_angle)))
+        arrow_p2 = QtCore.QPointF(
+            arrowEnd.x() + arrow_head_len * math.cos(angle - math.pi - math.radians(arrow_head_angle)),
+            arrowEnd.y() + arrow_head_len * math.sin(angle - math.pi - math.radians(arrow_head_angle)))
+        arrow.lineTo(arrow_p1)
+        arrow.moveTo(arrowEnd)
+        arrow.lineTo(arrow_p2)
+        item = QtWidgets.QGraphicsPathItem(arrow)
+        # Grabbing the colors from indices
+        R, G, B = [int(i * 255) for i in _COLORS[int(highlight_class)]]
+        item.setPen(QtGui.QPen(QtGui.QColor(R, G, 0), 3))
+        self.scene.addItem(item)
+
     def item_clicked(self, item):
         s = item.text()
-        tuple_str = re.search(r'\(([\d\.]+),\s*([\d\.]+),\s*([\d\.]+),\s*([\d\.]+)\)', s).group(1, 2, 3, 4)
-        bbox = tuple(map(float, tuple_str))
-        self.selected_bbox = bbox
-        highlight_class = s.split(' ')[0]
-        self.redrawBoundingBoxExcept(self.current_file, bbox, highlight_class)
+        type = s.split(': ')[0]
+        if type == 'bbox':
+            s = s.split(': ')[1]
+            tuple_str = re.search(r'\(([\d\.]+),\s*([\d\.]+),\s*([\d\.]+),\s*([\d\.]+)\)', s).group(1, 2, 3, 4)
+            bbox = tuple(map(float, tuple_str))
+            self.selected_type = 0
+            self.selected_bbox = bbox
+            highlight_class = s.split(' ')[0]
+            self.redrawBoundingBoxExcept(self.current_file, bbox, highlight_class)
+        if type == 'kpt':
+            s = s.split(': ')[1]
+            match = re.search(r"\[\[.*\]\]", s)
+            if match:
+                result = match.group()
+            highlight_class = s.split(' ')[0]
+            kpt = ast.literal_eval(result)
+            self.selected_kpt = kpt
+            self.selected_type = 1
+            self.redrawKeypointsExcept(self.current_file, kpt, highlight_class)
 
     def bbox_tbrowser_focus_out(self, event):
         for item in self.scene.items():
@@ -509,6 +618,9 @@ class Ui_Dialog(QtWidgets.QDialog):
         for key, value in self.annotated_bboxes[current_file].items():
             for bbox in value:
                 self.bbox_tbrowser.addItem(key + ' ' + str(bbox))
+        for key, value in self.annotated_keypoints[current_file].items():
+            for keypoints in value:
+                self.bbox_tbrowser.addItem(key + ' ' + str(keypoints))
 
     def save_annotations(self):
         filename, _ = QtWidgets.QFileDialog.getSaveFileName(self, "Save File", "./Saves", "JSON Files (*.json)")
@@ -560,20 +672,42 @@ class Ui_Dialog(QtWidgets.QDialog):
             self.isDrawingArrow = True
             event.accept()  # accept the event to stop it from propagating to other widgets
         elif event.key() == QtCore.Qt.Key_Delete:
-            for key, value in self.annotated_bboxes[self.current_file].items():
-                for bbox in value:
-                    if bbox == self.selected_bbox:
-                        self.annotated_bboxes[self.current_file][key].remove(bbox)
-                        bbox_to_remove = key + ' ' + str(bbox)
-                        for i in range(self.bbox_tbrowser.count()):
-                            if self.bbox_tbrowser.item(i).text() == bbox_to_remove:
-                                self.bbox_tbrowser.takeItem(i)
-                                break
-            for item in self.scene.items():
-                if isinstance(item, QtWidgets.QGraphicsRectItem):
-                    self.scene.removeItem(item)
-            self.redrawBoundingBox(self.current_file)
-            event.accept()  # accept the event to stop it from propagating to other widgets
+            if self.selected_type == 0:
+                for key, value in self.annotated_bboxes[self.current_file].items():
+                    for bbox in value:
+                        if bbox == self.selected_bbox:
+                            self.annotated_bboxes[self.current_file][key].remove(bbox)
+                            bbox_to_remove = 'bbox: ' + key + ' ' + str(bbox)
+                            for i in range(self.bbox_tbrowser.count()):
+                                if self.bbox_tbrowser.item(i).text() == bbox_to_remove:
+                                    self.bbox_tbrowser.takeItem(i)
+                                    break
+                for item in self.scene.items():
+                    if isinstance(item, QtWidgets.QGraphicsRectItem):
+                        self.scene.removeItem(item)
+                self.redrawBoundingBox(self.current_file)
+                event.accept()  # accept the event to stop it from propagating to other widgets
+
+            elif self.selected_type == 1:
+                print('here')
+                for key, value in self.annotated_keypoints[self.current_file].items():
+                    for keypoints in value:
+                        print(keypoints)
+                        print(self.selected_kpt)
+                        if keypoints == self.selected_kpt:
+                            print('here')
+                            self.annotated_keypoints[self.current_file][key].remove(keypoints)
+                            kpt_to_remove = 'kpt: ' + key + ' ' + str(keypoints)
+                            for i in range(self.bbox_tbrowser.count()):
+                                if self.bbox_tbrowser.item(i).text() == kpt_to_remove:
+                                    self.bbox_tbrowser.takeItem(i)
+                                    break
+                for item in self.scene.items():
+                    if isinstance(item, QtWidgets.QGraphicsPathItem):
+                        self.scene.removeItem(item)
+                self.redrawKeypoints(self.current_file)
+                event.accept()  # accept the event to stop it from propagating to other widgets
+
         elif event.type() == QtCore.QEvent.KeyPress and event.key() == QtCore.Qt.Key_Control:
             self.ctrl_pressed = True
             self.graphicsView.viewport().setCursor(QtCore.Qt.OpenHandCursor)
@@ -677,7 +811,7 @@ class Ui_Dialog(QtWidgets.QDialog):
                     if self.current_class_id not in self.annotated_bboxes[self.current_file]:
                         self.annotated_bboxes[self.current_file][self.current_class_id] = []
                     self.annotated_bboxes[self.current_file][self.current_class_id].append(bbox)
-                    self.bbox_tbrowser.addItem(self.current_class_id + ' ' + str(bbox))
+                    self.bbox_tbrowser.addItem('bbox: ' + self.current_class_id + ' ' + str(bbox))
                     return True
 
             elif self.isDrawingArrow:
@@ -692,11 +826,15 @@ class Ui_Dialog(QtWidgets.QDialog):
                 else:
                     # finish drawing
                     end = self.graphicsView.mapToScene(event.pos())
-                    print(end)
                     self.arrowEnd = end
                     self.drawnArrow = False
-                    self.isDrawingArrow = False
+                    keypoints = [[round(self.arrowStart.x(), 2), round(self.arrowStart.y(), 2), 1],
+                                 [round(self.arrowEnd.x(), 2), round(self.arrowEnd.y(), 2), 1]]
                     self.drawArrow()
+                    if self.current_class_id not in self.annotated_keypoints[self.current_file]:
+                        self.annotated_keypoints[self.current_file][self.current_class_id] = []
+                    self.annotated_keypoints[self.current_file][self.current_class_id].append(keypoints)
+                    self.bbox_tbrowser.addItem('kpt: ' + self.current_class_id + ' ' + str(keypoints))
                     return True
 
         if event.type() == QtCore.QEvent.Wheel and source is self.graphicsView.viewport():
@@ -734,7 +872,7 @@ class Ui_Dialog(QtWidgets.QDialog):
         items = self.scene.items()
         # Iterate through the list to find the item you're looking for
         for item in items:
-            if isinstance(item, QtWidgets.QGraphicsLineItem) and item.data(0) == 'preview_arrow':
+            if isinstance(item, QtWidgets.QGraphicsPathItem) and item.data(0) == 'preview_arrow':
                 self.scene.removeItem(item)
         arrow = QtGui.QPainterPath()
         arrow.moveTo(self.arrowStart)
@@ -782,7 +920,7 @@ class Ui_Dialog(QtWidgets.QDialog):
         items = self.scene.items()
         # Iterate through the list to find the item you're looking for
         for item in items:
-            if item.data(0) == 'preview_arrow':
+            if isinstance(item, QtWidgets.QGraphicsPathItem) and item.data(0) == 'preview_arrow':
                 self.scene.removeItem(item)
         arrow = QtGui.QPainterPath()
         arrow.moveTo(self.arrowStart)
