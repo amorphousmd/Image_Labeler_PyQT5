@@ -1,31 +1,31 @@
-# Label_BoundingBox
-A tool for labeling bounding boxes of training images. It is based on BBox-Label-Tool and supports multi-class labeling. Here is a demo:
+# Image Labeling Tool PyQT5
+A tool incorporating labeling, augmenting, training, visualizing images. Currently supporting exporting and training in YOLOv7 and Keypoints RCNN.\
+For a similar implementation in Tkinter, try this repo: https://github.com/danFromTelAviv/bounding-box-labeler-yolo\
+Some demos:
+![YOLOLablerDemo1](https://user-images.githubusercontent.com/20887245/234948143-ba3fa97a-faf5-4479-b657-b090a8d6a520.png)
+![YOLOLablerDemo2](https://user-images.githubusercontent.com/20887245/234948131-b80115f9-8157-4d34-a3d9-8cd48ca133ea.png)
+![YOLOLablerDemo3](https://user-images.githubusercontent.com/20887245/234948114-0a24f7ff-9030-49e2-bab6-b6eae562f9d8.png)
 
-<img src="https://raw.githubusercontent.com/hjptriplebee/Label_BoundingBox/master/demo.jpg" width = "850" height = "600" alt="demo" />
+# Functionalities
+## Labeling
+- Arbitrary changing annotating images and working directory.
+- Saving and loading annotations.
+- Bounding boxes labeling and keypoints labeling.
+- Labels highlighting and removing.
+- Zooming and Panning images.
+- Navigating in a working directory (prev, next, index jump).
+## Exporting and training
+- Image Augmentations (Noises, brightness changes, flipping)
+- Train/Val/Test Splitting
+- Training Control: Model, batch size, learn rate, epochs
+- Training Visualization
 
-# Requirement
-- Python (2 and 3 is all ok, 2 need a little change)
-- OpenCV (It isn't necessary, if you only use labeling function. OpenCV is only for getFrameFromVideo.py)
-- tkinter
-- PIL
+# Controls
 
-# Usage
-## for basic bbox-label-tool:
-- Put image in the folder which is under "Images"
-- Start label-tool with "python3 main.py"
-- Input "Image Dir" which is the name of your folder under "Images"
-- click "load" and you can label images now!
-- To create a new bounding box, left-click to select the first vertex. Moving the mouse to draw a rectangle, and left-click again to select the second vertex.
-- To cancel the bounding box while drawing, just press "&lt;ESC&gt;"
-- To delete a existing bounding box, select it from the listbox, and click 'Delete'.
-- To delete all existing bounding boxes in the image, simply click 'ClearAll'.
-- After finishing one image, click 'Next' to advance. Likewise, click 'Prev' to reverse. You can press "&lt;Left&gt;" and "&lt;Right&gt;" Or input the index and click 'Go' to navigate to an arbitrary image instead. ***The labeling result will be saved if and only if the 'Next' button is clicked.***
-- label files are stored in "Labels" folder
-
-## for multi-class labeling:
-- Write down your classes in "class.txt"
-- Start label-tool and select class at the top-right corner. ***remember to click "ConfirmClass"***
-- After clicking "ConfirmClass", you can label different classes with different colors.
-
-## for get Frame from Video:
-It isn't user-friendly. If you want to use it, I recommend you to read source code carefully!
+| Actions  | Shortcuts |
+| ------------- |:-------------:|
+| Zooming      | Control + MouseScroll     |
+| Panning      | Control + Drag     |
+| Draw Bounding Box      | B     |
+| Draw Keypoint      | A     |
+| Delete Label    | Del (On selected label)     |
