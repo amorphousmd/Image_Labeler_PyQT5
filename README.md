@@ -1,7 +1,7 @@
 # Image Labeling Tool PyQT5
 A tool incorporating labeling, augmenting, training, visualizing images. Currently supporting exporting and training in YOLOv7 and Keypoints RCNN.\
 For a similar implementation in Tkinter, try this repo: https://github.com/danFromTelAviv/bounding-box-labeler-yolo
-\
+
 ## Demos:
 ![YOLOLablerDemo1](https://user-images.githubusercontent.com/20887245/234948143-ba3fa97a-faf5-4479-b657-b090a8d6a520.png)
 ![YOLOLablerDemo2](https://user-images.githubusercontent.com/20887245/234948131-b80115f9-8157-4d34-a3d9-8cd48ca133ea.png)
