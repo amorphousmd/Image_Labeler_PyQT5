@@ -102,7 +102,7 @@ ENV/
 
 .idea/
 
-*.jpg
+
 
 *.txt
 
@@ -111,3 +111,6 @@ yolov7/
 tdd.py
 
 Dataset/train/annotations/
+
+
+*.jpg
