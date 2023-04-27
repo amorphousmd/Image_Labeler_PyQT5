@@ -164,7 +164,7 @@
      <property name="geometry">
       <rect>
        <x>20</x>
-       <y>20</y>
+       <y>580</y>
        <width>311</width>
        <height>76</height>
       </rect>
@@ -302,7 +302,7 @@
      <property name="geometry">
       <rect>
        <x>20</x>
-       <y>140</y>
+       <y>720</y>
        <width>311</width>
        <height>41</height>
       </rect>
@@ -356,7 +356,7 @@
      <property name="geometry">
       <rect>
        <x>20</x>
-       <y>100</y>
+       <y>670</y>
        <width>101</width>
        <height>41</height>
       </rect>
@@ -382,12 +382,15 @@
      <property name="geometry">
       <rect>
        <x>20</x>
-       <y>190</y>
+       <y>770</y>
        <width>311</width>
        <height>41</height>
       </rect>
      </property>
      <layout class="QHBoxLayout" name="horizontalLayout_6">
+      <item>
+       <widget class="QComboBox" name="output_format_combobox"/>
+      </item>
       <item>
        <widget class="QPushButton" name="generate_dataset_button">
         <property name="text">
@@ -395,21 +398,18 @@
         </property>
        </widget>
       </item>
-      <item>
-       <widget class="QComboBox" name="output_format_combobox"/>
-      </item>
      </layout>
     </widget>
-    <widget class="QWidget" name="horizontalLayoutWidget_8">
+    <widget class="QWidget" name="horizontalLayoutWidget_9">
      <property name="geometry">
       <rect>
        <x>20</x>
-       <y>660</y>
+       <y>20</y>
        <width>311</width>
-       <height>128</height>
+       <height>181</height>
       </rect>
      </property>
-     <layout class="QHBoxLayout" name="horizontalLayout_8">
+     <layout class="QHBoxLayout" name="horizontalLayout_9">
       <item>
        <layout class="QVBoxLayout" name="verticalLayout_3">
         <item>
@@ -450,11 +450,15 @@
        </layout>
       </item>
       <item>
-       <widget class="QPushButton" name="export_button">
-        <property name="text">
-         <string>Export</string>
-        </property>
-       </widget>
+       <layout class="QVBoxLayout" name="verticalLayout_2">
+        <item>
+         <widget class="QPushButton" name="augment_button">
+          <property name="text">
+           <string>Run Augmentations</string>
+          </property>
+         </widget>
+        </item>
+       </layout>
       </item>
      </layout>
     </widget>

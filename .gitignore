@@ -109,3 +109,5 @@ ENV/
 yolov7/
 
 tdd.py
+
+Dataset/train/annotations/

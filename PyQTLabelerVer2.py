@@ -140,6 +140,7 @@ class Ui_Dialog(QtWidgets.QDialog):
         self.output_format_combobox.addItem("YOLOv7 Pytorch (.txt)")
         self.output_format_combobox.addItem("YOLOv5 Pytorch (.txt)")
         self.output_format_combobox.addItem("COCO (.json)")
+        self.output_format_combobox.addItem("KeyPoints RCNN (.json)")
         self.output_format_combobox.addItem("Tensorflow Detection (.csv)")
         self.model_combobox.addItem("YOLOv7")
         self.model_combobox.addItem("YOLOv7-tiny")
@@ -289,7 +290,7 @@ class Ui_Dialog(QtWidgets.QDialog):
         self.next_button.clicked.connect(self.load_next)
         self.goto_button.clicked.connect(self.goto_index)
         self.dir_change_button.clicked.connect(self.change_directory)
-        self.export_button.clicked.connect(self.export)
+        self.augment_button.clicked.connect(self.augment)
         self.tvt_slider.valueChanged.connect(lambda value: self.tvt_label.setText(str(value)))
         self.vt_slider.valueChanged.connect(lambda value: self.vt_label.setText(str(value)))
         self.generate_dataset_button.clicked.connect(self.generate_dataset)
@@ -629,7 +630,8 @@ class Ui_Dialog(QtWidgets.QDialog):
             # create dictionary to save
             data = {
                 'annotated_bboxes': self.annotated_bboxes,
-                'dataset_metadata': self.dataset_metadata
+                'dataset_metadata': self.dataset_metadata,
+                'annotated_keypoints': self.annotated_keypoints
             }
             # write dictionary to file as JSON
             with open(filename, 'w') as f:
@@ -651,6 +653,7 @@ class Ui_Dialog(QtWidgets.QDialog):
 
         self.annotated_bboxes = data["annotated_bboxes"]
         self.dataset_metadata = data["dataset_metadata"]
+        self.annotated_keypoints = data["annotated_keypoints"]
 
         try:
             self.redrawBoundingBox(self.current_file)
@@ -828,6 +831,7 @@ class Ui_Dialog(QtWidgets.QDialog):
                     end = self.graphicsView.mapToScene(event.pos())
                     self.arrowEnd = end
                     self.drawnArrow = False
+                    self.isDrawingArrow = False
                     keypoints = [[round(self.arrowStart.x(), 2), round(self.arrowStart.y(), 2), 1],
                                  [round(self.arrowEnd.x(), 2), round(self.arrowEnd.y(), 2), 1]]
                     self.drawArrow()
@@ -944,135 +948,141 @@ class Ui_Dialog(QtWidgets.QDialog):
         item.setData(0, 'preview_arrow')
         self.scene.addItem(item)
 
-    def export(self):
-        prob = 0.02
-        brightness_range = [-100, 100]
-        # set the input and output folder paths
-        self.annotated_bboxes_noaug = copy.deepcopy(self.annotated_bboxes)
-        input_folder = "./Images"
-        output_folder = "./AugmentedImages"
+    def augment(self):
+        selected_format = self.output_format_combobox.currentText()
+        if selected_format != 'KeyPoints RCNN (.json)':
+            prob = 0.02
+            brightness_range = [-100, 100]
+            # set the input and output folder paths
+            self.annotated_bboxes_noaug = copy.deepcopy(self.annotated_bboxes)
+            input_folder = "./Images"
+            output_folder = "./AugmentedImages"
 
-        # loop over all the files in the input folder
-        for filename in os.listdir(input_folder):
-            # check if the file is an image
-            if filename.endswith(".jpg"):
-                # open the image
-                image_path = os.path.join(input_folder, filename)
-                image = Image.open(image_path)
-                print(image.size)
-
-                # Horizontal Flip
-                if self.hflip_checkbox.isChecked():
-                    hflipped_image = image.transpose(Image.FLIP_LEFT_RIGHT)
-                    output_filename = os.path.splitext(filename)[0] + '_hflipped.jpg'
-                    output_path = os.path.join(output_folder, output_filename)
-                    hflipped_image.save(output_path)
-
-                # Vertical flip
-                if self.vflip_checkbox.isChecked():
-                    vflipped_image = image.transpose(Image.FLIP_TOP_BOTTOM)
-                    output_filename = os.path.splitext(filename)[0] + '_vflipped.jpg'
-                    output_path = os.path.join(output_folder, output_filename)
-                    vflipped_image.save(output_path)
-
-                if self.noises_checkbox.isChecked():
-                    # add noise to the image
-
-                    image = cv2.imread(os.path.join("./Images", filename))
-
-                    # Generate mask of pixels to set to white
-                    mask = np.random.rand(*image.shape[:2]) < prob
-
-                    # Set pixels to white
-                    image[mask, :] = [255, 255, 255]
-
-                    # Save noisy image
-                    cv2.imwrite(os.path.join("./AugmentedImages", os.path.splitext(filename)[0]) + '_noises.jpg', image)
-
-
-                # randomly adjust the brightness
-                if self.brightness_checkbox.isChecked():
+            # loop over all the files in the input folder
+            for filename in os.listdir(input_folder):
+                # check if the file is an image
+                if filename.endswith(".jpg"):
+                    # open the image
                     image_path = os.path.join(input_folder, filename)
                     image = Image.open(image_path)
-                    brightness = random.randint(brightness_range[0], brightness_range[1])
-                    adjusted_image = Image.eval(image, lambda x: x + brightness)
+                    print(image.size)
 
-                    # save the adjusted image
-                    output_filename = os.path.splitext(filename)[0] + "_brchgd" + ".jpg"
-                    output_path = os.path.join(output_folder, output_filename)
-                    adjusted_image.save(output_path)
+                    # Horizontal Flip
+                    if self.hflip_checkbox.isChecked():
+                        hflipped_image = image.transpose(Image.FLIP_LEFT_RIGHT)
+                        output_filename = os.path.splitext(filename)[0] + '_hflipped.jpg'
+                        output_path = os.path.join(output_folder, output_filename)
+                        hflipped_image.save(output_path)
 
-        if self.hflip_checkbox.isChecked():
-            new_dict_data = {}
+                    # Vertical flip
+                    if self.vflip_checkbox.isChecked():
+                        vflipped_image = image.transpose(Image.FLIP_TOP_BOTTOM)
+                        output_filename = os.path.splitext(filename)[0] + '_vflipped.jpg'
+                        output_path = os.path.join(output_folder, output_filename)
+                        vflipped_image.save(output_path)
 
-            for key, value in self.annotated_bboxes_noaug.items():
-                new_key = key.split(".")[0] + "_hflipped.jpg"
-                new_value = {}
-                image_path = os.path.join(output_folder, new_key)
-                image = Image.open(image_path)
-                image_width = image.width
-                for inner_key, inner_value in value.items():
-                    new_inner_value = []
-                    for bbox in inner_value:
-                        x, y, w, h = bbox
-                        new_x = image_width - x - w
-                        new_inner_value.append((new_x, y, w, h))
-                    new_value[inner_key] = new_inner_value
-                new_dict_data[new_key] = new_value
-            self.annotated_bboxes.update(new_dict_data)
+                    if self.noises_checkbox.isChecked():
+                        # add noise to the image
 
-        if self.vflip_checkbox.isChecked():
-            new_dict_data = {}
-            for key, value in self.annotated_bboxes_noaug.items():
-                new_key = key.split(".")[0] + "_vflipped.jpg"
-                new_value = {}
-                image_path = os.path.join(output_folder, new_key)
-                image = Image.open(image_path)
-                image_height = image.height
-                for inner_key, inner_value in value.items():
-                    new_inner_value = []
-                    for bbox in inner_value:
-                        x, y, w, h = bbox
-                        new_y = image_height - y - h
-                        new_inner_value.append((x, new_y, w, h))
-                    new_value[inner_key] = new_inner_value
-                new_dict_data[new_key] = new_value
-            self.annotated_bboxes.update(new_dict_data)
+                        image = cv2.imread(os.path.join("./Images", filename))
 
-        if self.noises_checkbox.isChecked():
-            # make a copy of the original dictionary
-            new_dict_data = copy.deepcopy(self.annotated_bboxes)
+                        # Generate mask of pixels to set to white
+                        mask = np.random.rand(*image.shape[:2]) < prob
 
-            for key, value in self.annotated_bboxes_noaug.items():
-                # check if the key ends with ".jpg"
-                if key.endswith(".jpg"):
-                    # get the new key name with "_noises.jpg" appended to it
-                    new_key = key.split(".jpg")[0] + "_noises.jpg"
-                    # set the value of the new key to be the same as the original key
-                    new_dict_data[new_key] = self.annotated_bboxes[key]
+                        # Set pixels to white
+                        image[mask, :] = [255, 255, 255]
 
-            # concatenate the new dictionary with the original one
-            self.annotated_bboxes.update(new_dict_data)
+                        # Save noisy image
+                        cv2.imwrite(os.path.join("./AugmentedImages", os.path.splitext(filename)[0]) + '_noises.jpg', image)
 
-        if self.brightness_checkbox.isChecked():
-            # make a copy of the original dictionary
-            new_dict_data = copy.deepcopy(self.annotated_bboxes)
 
-            for key, value in self.annotated_bboxes_noaug.items():
-                # check if the key ends with ".jpg"
-                if key.endswith(".jpg"):
-                    # get the new key name with "_noises.jpg" appended to it
-                    new_key = key.split(".jpg")[0] + "_brchgd.jpg"
-                    # set the value of the new key to be the same as the original key
-                    new_dict_data[new_key] = self.annotated_bboxes[key]
+                    # randomly adjust the brightness
+                    if self.brightness_checkbox.isChecked():
+                        image_path = os.path.join(input_folder, filename)
+                        image = Image.open(image_path)
+                        brightness = random.randint(brightness_range[0], brightness_range[1])
+                        adjusted_image = Image.eval(image, lambda x: x + brightness)
 
-            # concatenate the new dictionary with the original one
-            self.annotated_bboxes.update(new_dict_data)
+                        # save the adjusted image
+                        output_filename = os.path.splitext(filename)[0] + "_brchgd" + ".jpg"
+                        output_path = os.path.join(output_folder, output_filename)
+                        adjusted_image.save(output_path)
 
-            for file_name in os.listdir("./AugmentedImages"):
-                if file_name.endswith(".jpg"):
-                    shutil.copy(os.path.join("./AugmentedImages", file_name), os.path.join("./Dataset", file_name))
-                    self.touch_image(file_name)
+            if self.hflip_checkbox.isChecked():
+                new_dict_data = {}
+
+                for key, value in self.annotated_bboxes_noaug.items():
+                    new_key = key.split(".")[0] + "_hflipped.jpg"
+                    new_value = {}
+                    image_path = os.path.join(output_folder, new_key)
+                    image = Image.open(image_path)
+                    image_width = image.width
+                    for inner_key, inner_value in value.items():
+                        new_inner_value = []
+                        for bbox in inner_value:
+                            x, y, w, h = bbox
+                            new_x = image_width - x - w
+                            new_inner_value.append((new_x, y, w, h))
+                        new_value[inner_key] = new_inner_value
+                    new_dict_data[new_key] = new_value
+                self.annotated_bboxes.update(new_dict_data)
+
+            if self.vflip_checkbox.isChecked():
+                new_dict_data = {}
+                for key, value in self.annotated_bboxes_noaug.items():
+                    new_key = key.split(".")[0] + "_vflipped.jpg"
+                    new_value = {}
+                    image_path = os.path.join(output_folder, new_key)
+                    image = Image.open(image_path)
+                    image_height = image.height
+                    for inner_key, inner_value in value.items():
+                        new_inner_value = []
+                        for bbox in inner_value:
+                            x, y, w, h = bbox
+                            new_y = image_height - y - h
+                            new_inner_value.append((x, new_y, w, h))
+                        new_value[inner_key] = new_inner_value
+                    new_dict_data[new_key] = new_value
+                self.annotated_bboxes.update(new_dict_data)
+
+            if self.noises_checkbox.isChecked():
+                # make a copy of the original dictionary
+                new_dict_data = copy.deepcopy(self.annotated_bboxes)
+
+                for key, value in self.annotated_bboxes_noaug.items():
+                    # check if the key ends with ".jpg"
+                    if key.endswith(".jpg"):
+                        # get the new key name with "_noises.jpg" appended to it
+                        new_key = key.split(".jpg")[0] + "_noises.jpg"
+                        # set the value of the new key to be the same as the original key
+                        new_dict_data[new_key] = self.annotated_bboxes[key]
+
+                # concatenate the new dictionary with the original one
+                self.annotated_bboxes.update(new_dict_data)
+
+            if self.brightness_checkbox.isChecked():
+                # make a copy of the original dictionary
+                new_dict_data = copy.deepcopy(self.annotated_bboxes)
+
+                for key, value in self.annotated_bboxes_noaug.items():
+                    # check if the key ends with ".jpg"
+                    if key.endswith(".jpg"):
+                        # get the new key name with "_noises.jpg" appended to it
+                        new_key = key.split(".jpg")[0] + "_brchgd.jpg"
+                        # set the value of the new key to be the same as the original key
+                        new_dict_data[new_key] = self.annotated_bboxes[key]
+
+                # concatenate the new dictionary with the original one
+                self.annotated_bboxes.update(new_dict_data)
+
+                for file_name in os.listdir("./AugmentedImages"):
+                    if file_name.endswith(".jpg"):
+                        shutil.copy(os.path.join("./AugmentedImages", file_name), os.path.join("./Dataset", file_name))
+                        self.touch_image(file_name)
+
+        else:
+            print('ball so hard')
+
 
     def generate_dataset(self):
         folder_path = "./Dataset"
@@ -1095,7 +1105,8 @@ class Ui_Dialog(QtWidgets.QDialog):
         self.train_imgs_label.setText(str(num_train_imgs))
         self.val_imgs_label.setText(str(num_val_imgs))
         self.test_imgs_label.setText(str(num_test_imgs))
-        split_dataset(self.annotated_bboxes, self.dataset_metadata, num_train_imgs, num_val_imgs, num_test_imgs)
+        self.split_dataset(self.annotated_bboxes, self.annotated_keypoints, self.dataset_metadata,
+                      num_train_imgs, num_val_imgs, num_test_imgs)
 
     def train(self):
         if not os.path.exists("Training/yolov7"):
@@ -1231,97 +1242,178 @@ class Ui_Dialog(QtWidgets.QDialog):
         print("\n")
 
 
-def split_dataset(dict_data, sizes, train_size, val_size, test_size):
-    print(dict_data)
-    print(sizes)
-    if not os.path.exists("./Dataset"):
-        os.makedirs("./Dataset")
+    def split_dataset(self, dict_data, kpt_data, sizes, train_size, val_size, test_size):
+        print(dict_data)
+        print(kpt_data)
+        print(sizes)
+        if self.output_format_combobox.currentText() != 'KeyPoints RCNN (.json)':
+            if not os.path.exists("./Dataset"):
+                os.makedirs("./Dataset")
 
-    folders = ['train', 'test', 'val']
-    for folder in folders:
-        if not os.path.exists(f"./Dataset/{folder}"):
-            os.makedirs(f"./Dataset/{folder}")
+            folders = ['train', 'test', 'val']
+            for folder in folders:
+                if not os.path.exists(f"./Dataset/{folder}"):
+                    os.makedirs(f"./Dataset/{folder}")
 
-        if not os.path.exists(f"./Dataset/{folder}/images"):
-            os.makedirs(f"./Dataset/{folder}/images")
+                if not os.path.exists(f"./Dataset/{folder}/images"):
+                    os.makedirs(f"./Dataset/{folder}/images")
 
-        if not os.path.exists(f"./Dataset/{folder}/labels"):
-            os.makedirs(f"./Dataset/{folder}/labels")
+                if not os.path.exists(f"./Dataset/{folder}/labels"):
+                    os.makedirs(f"./Dataset/{folder}/labels")
 
-    normalized_dict = {}
-    for filename, annotations in dict_data.items():
-        size = sizes[filename]['_size']
-        width, height = size[0], size[1]
-        normalized_annotations = {}
-        for label, bboxes in annotations.items():
-            normalized_bboxes = []
-            for bbox in bboxes:
-                x, y, w, h = bbox
-                w_normalized = w / width
-                h_normalized = h / height
-                x_normalized = x / width + w_normalized / 2
-                y_normalized = y / height + h_normalized / 2
-                normalized_bbox = (x_normalized, y_normalized, w_normalized, h_normalized)
-                normalized_bboxes.append(normalized_bbox)
-            normalized_annotations[label] = normalized_bboxes
-        normalized_dict[filename] = normalized_annotations
+            normalized_dict = {}
+            for filename, annotations in dict_data.items():
+                size = sizes[filename]['_size']
+                width, height = size[0], size[1]
+                normalized_annotations = {}
+                for label, bboxes in annotations.items():
+                    normalized_bboxes = []
+                    for bbox in bboxes:
+                        x, y, w, h = bbox
+                        w_normalized = w / width
+                        h_normalized = h / height
+                        x_normalized = x / width + w_normalized / 2
+                        y_normalized = y / height + h_normalized / 2
+                        normalized_bbox = (x_normalized, y_normalized, w_normalized, h_normalized)
+                        normalized_bboxes.append(normalized_bbox)
+                    normalized_annotations[label] = normalized_bboxes
+                normalized_dict[filename] = normalized_annotations
 
-    print(normalized_dict)
+            print(normalized_dict)
 
-    # Get the list of image names from normalized_dict
-    image_names = list(normalized_dict.keys())
+            # Get the list of image names from normalized_dict
+            image_names = list(normalized_dict.keys())
 
-    # Split the image names into train, val, and test sets
-    train_images, val_test_images = train_test_split(image_names, train_size=train_size, test_size=val_size + test_size)
-    val_images, test_images = train_test_split(val_test_images, train_size=val_size, test_size=test_size)
+            # Split the image names into train, val, and test sets
+            train_images, val_test_images = train_test_split(image_names, train_size=train_size, test_size=val_size + test_size)
+            val_images, test_images = train_test_split(val_test_images, train_size=val_size, test_size=test_size)
 
-    # Create the train_normalized_dict, val_normalized_dict, and test_normalized_dict
-    train_normalized_dict = {img_name: normalized_dict[img_name] for img_name in train_images}
-    val_normalized_dict = {img_name: normalized_dict[img_name] for img_name in val_images}
-    test_normalized_dict = {img_name: normalized_dict[img_name] for img_name in test_images}
+            # Create the train_normalized_dict, val_normalized_dict, and test_normalized_dict
+            train_normalized_dict = {img_name: normalized_dict[img_name] for img_name in train_images}
+            val_normalized_dict = {img_name: normalized_dict[img_name] for img_name in val_images}
+            test_normalized_dict = {img_name: normalized_dict[img_name] for img_name in test_images}
 
-    print(train_normalized_dict)
-    print(val_normalized_dict)
-    print(test_normalized_dict)
+            print(train_normalized_dict)
+            print(val_normalized_dict)
+            print(test_normalized_dict)
 
-    for img_name, bboxes in train_normalized_dict.items():
-        if not os.path.exists(os.path.join("./Dataset", img_name)):
-            print("Data not found")
+            for img_name, bboxes in train_normalized_dict.items():
+                if not os.path.exists(os.path.join("./Dataset", img_name)):
+                    print("Data not found")
+                else:
+                    shutil.copy(os.path.join("./Dataset", img_name), os.path.join("./Dataset/train/images", img_name))
+                with open(os.path.join("./Dataset/train/labels", f"{img_name.split('.')[0]}.txt"), "w") as f:
+                    for label, boxes in bboxes.items():
+                        for box in boxes:
+                            x, y, w, h = box
+                            f.write(f"{label} {x} {y} {w} {h}\n")
+
+            for img_name, bboxes in val_normalized_dict.items():
+                if not os.path.exists(os.path.join("./Dataset", img_name)):
+                    print("Data not found")
+                else:
+                    shutil.copy(os.path.join("./Dataset", img_name), os.path.join("./Dataset/val/images", img_name))
+                with open(os.path.join("./Dataset/val/labels", f"{img_name.split('.')[0]}.txt"), "w") as f:
+                    for label, boxes in bboxes.items():
+                        for box in boxes:
+                            x, y, w, h = box
+                            f.write(f"{label} {x} {y} {w} {h}\n")
+
+            for img_name, bboxes in test_normalized_dict.items():
+                if not os.path.exists(os.path.join("./Dataset", img_name)):
+                    print("Data not found")
+                else:
+                    shutil.copy(os.path.join("./Dataset", img_name), os.path.join("./Dataset/test/images", img_name))
+                with open(os.path.join("./Dataset/test/labels", f"{img_name.split('.')[0]}.txt"), "w") as f:
+                    for label, boxes in bboxes.items():
+                        for box in boxes:
+                            x, y, w, h = box
+                            f.write(f"{label} {x} {y} {w} {h}\n")
         else:
-            shutil.copy(os.path.join("./Dataset", img_name), os.path.join("./Dataset/train/images", img_name))
-        with open(os.path.join("./Dataset/train/labels", f"{img_name.split('.')[0]}.txt"), "w") as f:
-            for label, boxes in bboxes.items():
-                for box in boxes:
-                    x, y, w, h = box
-                    f.write(f"{label} {x} {y} {w} {h}\n")
+            val_size = 0
+            if not os.path.exists("./Dataset"):
+                os.makedirs("./Dataset")
 
-    for img_name, bboxes in val_normalized_dict.items():
-        if not os.path.exists(os.path.join("./Dataset", img_name)):
-            print("Data not found")
-        else:
-            shutil.copy(os.path.join("./Dataset", img_name), os.path.join("./Dataset/val/images", img_name))
-        with open(os.path.join("./Dataset/val/labels", f"{img_name.split('.')[0]}.txt"), "w") as f:
-            for label, boxes in bboxes.items():
-                for box in boxes:
-                    x, y, w, h = box
-                    f.write(f"{label} {x} {y} {w} {h}\n")
+            folders = ['train', 'test']
+            for folder in folders:
+                if not os.path.exists(f"./Dataset/{folder}"):
+                    os.makedirs(f"./Dataset/{folder}")
 
-    for img_name, bboxes in test_normalized_dict.items():
-        if not os.path.exists(os.path.join("./Dataset", img_name)):
-            print("Data not found")
-        else:
-            shutil.copy(os.path.join("./Dataset", img_name), os.path.join("./Dataset/test/images", img_name))
-        with open(os.path.join("./Dataset/test/labels", f"{img_name.split('.')[0]}.txt"), "w") as f:
-            for label, boxes in bboxes.items():
-                for box in boxes:
-                    x, y, w, h = box
-                    f.write(f"{label} {x} {y} {w} {h}\n")
+                if not os.path.exists(f"./Dataset/{folder}/images"):
+                    os.makedirs(f"./Dataset/{folder}/images")
+
+                if not os.path.exists(f"./Dataset/{folder}/annotations"):
+                    os.makedirs(f"./Dataset/{folder}/annotations")
+
+            normalized_dict = {}
+            for filename, annotations in dict_data.items():
+                normalized_annotations = {}
+                for label, bboxes in annotations.items():
+                    normalized_bboxes = []
+                    for bbox in bboxes:
+                        x, y, w, h = bbox
+                        x1 = x
+                        y1 = y
+                        x2 = x + w
+                        y2 = y + h
+                        normalized_bbox = [x1, y1, x2, y2]
+                        normalized_bboxes.append(normalized_bbox)
+                    normalized_annotations[label] = normalized_bboxes
+                normalized_dict[filename] = normalized_annotations
+
+            print(normalized_dict)
+
+            for img_name, bboxes in normalized_dict.items():
+                kpts = kpt_data[img_name]
+                if not os.path.exists(os.path.join("./Dataset", img_name)):
+                    print("Data not found")
+                else:
+                    shutil.copy(os.path.join("./Dataset", img_name), os.path.join("./Dataset/train/images", img_name))
+                # dictionary to store bounding boxes
+                data = {"bboxes": [], "keypoints": []}
+
+                for label, boxes in bboxes.items():
+                    for box in boxes:
+                        x, y, w, h = box
+                        data["bboxes"].append([x, y, w, h])
+
+                for label, kpts in kpts.items():
+                    for kpt in kpts:
+                        data["keypoints"].append(kpt)
+
+                with open(os.path.join("./Dataset/train/annotations", f"{img_name.split('.')[0]}.json"), "w") as f:
+                    json.dump(data, f)
+
+                # set the percentage of images to move to test set
+                percentage = (1 - self.tvt_split_ratio) * self.vt_split_ratio * 100
+
+                # get the list of all image files in the train/images directory
+                image_files = [f for f in os.listdir("Dataset/train/images") if f.endswith(".jpg")]
+
+                # randomly select a percentage of the image files
+                num_images = int(len(image_files) * percentage / 100)
+                test_images = random.sample(image_files, num_images)
+
+                # move the selected images and corresponding annotations to the test directory
+                os.makedirs("Dataset/test/images", exist_ok=True)
+                os.makedirs("Dataset/test/annotations", exist_ok=True)
+
+                for image in test_images:
+                    # move the image file
+                    shutil.move(os.path.join("Dataset/train/images", image), os.path.join("Dataset/test/images", image))
+
+                    # move the corresponding annotation file
+                    basename = os.path.splitext(image)[0]
+                    annotation_file = f"{basename}.json"
+                    if os.path.isfile(os.path.join("Dataset/train/annotations", annotation_file)):
+                        shutil.move(os.path.join("Dataset/train/annotations", annotation_file),
+                                    os.path.join("Dataset/test/annotations", annotation_file))
+
 
 def find_newest_results_folder():
     results_folders = glob.glob('./Training/yolov7/runs/train/exp*')
     newest_folder = max(results_folders, key=os.path.getctime)
     return newest_folder
-
 
 
 if __name__ == "__main__":
